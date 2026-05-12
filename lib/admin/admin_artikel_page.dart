@@ -9,7 +9,7 @@
 // ============================================================
 
 import 'package:flutter/material.dart';
-import 'admin_buat_artikel_page.dart';
+import 'admin_add_artikel_page.dart';
 
 // ── Model artikel ─────────────────────────────────────────────
 class DataArtikel {
