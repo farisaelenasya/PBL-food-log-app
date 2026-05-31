@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http; 
+import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'login_page.dart';
 import 'dashboard_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -17,31 +18,27 @@ class _RegisterPageState extends State<RegisterPage> {
   int _step = 0;
 
   // ── Controller data diri ──────────────────────────────────
-  final _namaCtrl         = TextEditingController();
-  final _emailCtrl        = TextEditingController();
-  final _passwordCtrl     = TextEditingController();
-  final _konfirmasiCtrl   = TextEditingController();
-  final _tinggiBadanCtrl  = TextEditingController();
-  final _beratBadanCtrl   = TextEditingController();
-  final _umurCtrl         = TextEditingController();
+  final _namaCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _konfirmasiCtrl = TextEditingController();
+  final _tinggiBadanCtrl = TextEditingController();
+  final _beratBadanCtrl = TextEditingController();
+  final _umurCtrl = TextEditingController();
 
   // ── Controller OTP (6 digit) ──────────────────────────────
   final List<TextEditingController> _otpCtrls =
       List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _otpFocus =
-      List.generate(6, (_) => FocusNode());
+  final List<FocusNode> _otpFocus = List.generate(6, (_) => FocusNode());
 
   // ── State pilihan ─────────────────────────────────────────
-  bool _sembunyikanPassword   = true;
+  bool _sembunyikanPassword = true;
   bool _sembunyikanKonfirmasi = true;
-  bool _sedangMemuat          = false;
-  bool _otpTerkirim           = false;
-  String _jenisKelamin        = 'Laki-laki';
-  String _tipeDiabetes        = 'Tipe 2';
+  bool _sedangMemuat = false;
+  bool _otpTerkirim = false;
+  String _jenisKelamin = 'Laki-laki';
+  String _tipeDiabetes = 'Tipe 2';
   DateTime? _tanggalLahir;
-
-  // OTP simulasi (di produksi pakai backend)
-  String _otpBenar = '123456';
 
   @override
   void dispose() {
@@ -59,13 +56,13 @@ class _RegisterPageState extends State<RegisterPage> {
 
   // ── Validasi step 0 dan lanjut ke step 1 ─────────────────
   void _lanjutKeTipeDiabetes() {
-    final nama     = _namaCtrl.text.trim();
-    final email    = _emailCtrl.text.trim();
+    final nama = _namaCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text.trim();
-    final konfirm  = _konfirmasiCtrl.text.trim();
-    final tinggi   = _tinggiBadanCtrl.text.trim();
-    final berat    = _beratBadanCtrl.text.trim();
-    final umur     = _umurCtrl.text.trim();
+    final konfirm = _konfirmasiCtrl.text.trim();
+    final tinggi = _tinggiBadanCtrl.text.trim();
+    final berat = _beratBadanCtrl.text.trim();
+    final umur = _umurCtrl.text.trim();
 
     if ([nama, email, password, konfirm, tinggi, berat, umur]
         .any((v) => v.isEmpty)) {
@@ -94,16 +91,29 @@ class _RegisterPageState extends State<RegisterPage> {
   // ── Kirim OTP ke email ────────────────────────────────────
   Future<void> _kirimOTP() async {
     setState(() => _sedangMemuat = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
-    setState(() {
-      _sedangMemuat = false;
-      _otpTerkirim  = true;
-      _step = 2;
-    });
-    _snackbar(
-      '✉️ Kode OTP dikirim ke ${_emailCtrl.text.trim()}',
-      const Color(0xFF26A69A),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse('http://127.0.0.1:8000/api/kirim-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': _emailCtrl.text.trim()}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['status'] == true) {
+        setState(() {
+          _sedangMemuat = false;
+          _otpTerkirim = true;
+          _step = 2;
+        });
+        _snackbar('✉️ Kode OTP dikirim ke ${_emailCtrl.text.trim()}',
+            const Color(0xFF26A69A));
+      } else {
+        setState(() => _sedangMemuat = false);
+        _snackbar(data['message'] ?? 'Gagal kirim OTP', Colors.red);
+      }
+    } catch (e) {
+      setState(() => _sedangMemuat = false);
+      _snackbar('Gagal terhubung ke server', Colors.red);
+    }
   }
 
   // ── Verifikasi OTP ────────────────────────────────────────
@@ -113,31 +123,94 @@ class _RegisterPageState extends State<RegisterPage> {
       _snackbar('Masukkan 6 digit kode OTP', Colors.red);
       return;
     }
-    if (inputOTP != _otpBenar) {
-      _snackbar('Kode OTP salah. Coba lagi.', Colors.red);
-      return;
-    }
-    setState(() => _sedangMemuat = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    setState(() => _sedangMemuat = false);
 
-    if (!mounted) return;
-    _snackbar('✅ Registrasi berhasil! Selamat datang.', const Color(0xFF26A69A));
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const DashboardPage()),
-    );
+    setState(() => _sedangMemuat = true);
+
+    try {
+      // Verifikasi OTP dulu
+      final otpRes = await http.post(
+        Uri.parse('http://127.0.0.1:8000/api/verifikasi-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': _emailCtrl.text.trim(),
+          'otp': inputOTP,
+        }),
+      );
+      final otpData = jsonDecode(otpRes.body);
+
+      if (otpRes.statusCode != 200 || otpData['status'] != true) {
+        _snackbar(otpData['message'] ?? 'OTP salah', Colors.red);
+        setState(() => _sedangMemuat = false);
+        return;
+      }
+
+      // OTP valid → register ke API
+      final regRes = await http.post(
+        Uri.parse('http://127.0.0.1:8000/api/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': _namaCtrl.text.trim(),
+          'email': _emailCtrl.text.trim(),
+          'password': _passwordCtrl.text.trim(),
+          'tanggal_lahir': _tanggalLahir != null
+              ? '${_tanggalLahir!.year}-${_tanggalLahir!.month.toString().padLeft(2, '0')}-${_tanggalLahir!.day.toString().padLeft(2, '0')}'
+              : null,
+          'umur': int.tryParse(_umurCtrl.text.trim()),
+          'tinggi_badan': int.tryParse(_tinggiBadanCtrl.text.trim()),
+          'berat_badan': int.tryParse(_beratBadanCtrl.text.trim()),
+          'jenis_kelamin': _jenisKelamin,
+          'tipe_diabetes': _tipeDiabetes,
+        }),
+      );
+
+      final regData = jsonDecode(regRes.body);
+
+      if (regRes.statusCode == 200 && regData['status'] == true) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', regData['token']);
+        await prefs.setString('user_name', regData['user']['name']);
+
+        if (!mounted) return;
+        _snackbar(
+            '✅ Registrasi berhasil! Selamat datang.', const Color(0xFF26A69A));
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const DashboardPage()),
+        );
+      } else {
+        _snackbar(regData['message'] ?? 'Registrasi gagal', Colors.red);
+      }
+    } catch (e) {
+      _snackbar('Gagal terhubung ke server', Colors.red);
+    } finally {
+      setState(() => _sedangMemuat = false);
+    }
   }
 
   // ── Kirim ulang OTP ───────────────────────────────────────
   Future<void> _kirimUlangOTP() async {
     for (final c in _otpCtrls) c.clear();
     setState(() => _sedangMemuat = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    setState(() => _sedangMemuat = false);
-    _snackbar('Kode OTP baru dikirim ulang', const Color(0xFF1A73E8));
+    try {
+      final response = await http.post(
+        Uri.parse('http://127.0.0.1:8000/api/kirim-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': _emailCtrl.text.trim()}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['status'] == true) {
+        _snackbar('✉️ Kode OTP baru dikirim ke ${_emailCtrl.text.trim()}',
+            const Color(0xFF1A73E8));
+      } else {
+        _snackbar(data['message'] ?? 'Gagal kirim ulang OTP', Colors.red);
+      }
+    } catch (e) {
+      _snackbar('Gagal terhubung ke server', Colors.red);
+    } finally {
+      setState(() => _sedangMemuat = false);
+    }
   }
 
   // ── Pilih tanggal lahir ───────────────────────────────────
@@ -159,8 +232,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (picked != null) {
       setState(() {
         _tanggalLahir = picked;
-        _umurCtrl.text =
-            (DateTime.now().year - picked.year).toString();
+        _umurCtrl.text = (DateTime.now().year - picked.year).toString();
       });
     }
   }
@@ -184,8 +256,19 @@ class _RegisterPageState extends State<RegisterPage> {
 
   String _bulanIndo(int m) {
     const b = [
-      '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      '',
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember'
     ];
     return b[m];
   }
@@ -203,8 +286,8 @@ class _RegisterPageState extends State<RegisterPage> {
             // ── Konten step ──────────────────────────────────
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: _step == 0
                     ? _buildFormDataDiri()
                     : _step == 1
@@ -260,7 +343,7 @@ class _RegisterPageState extends State<RegisterPage> {
           // Stepper visual
           Row(
             children: List.generate(3, (i) {
-              final bool done   = i < _step;
+              final bool done = i < _step;
               final bool active = i == _step;
               return Expanded(
                 child: Row(
@@ -283,9 +366,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             labels[i],
                             style: TextStyle(
                               fontSize: 10,
-                              fontWeight: active
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
+                              fontWeight:
+                                  active ? FontWeight.w700 : FontWeight.w500,
                               color: active
                                   ? const Color(0xFF1A73E8)
                                   : done
@@ -335,26 +417,30 @@ class _RegisterPageState extends State<RegisterPage> {
           _fieldInput(_namaCtrl, 'Nama Lengkap', Icons.person_rounded),
           _fieldInput(_emailCtrl, 'Email', Icons.email_rounded,
               keyboard: TextInputType.emailAddress),
-          _fieldPassword(_passwordCtrl, 'Kata Sandi',
+          _fieldPassword(
+              _passwordCtrl,
+              'Kata Sandi',
               _sembunyikanPassword,
-              () => setState(() => _sembunyikanPassword = !_sembunyikanPassword)),
-          _fieldPassword(_konfirmasiCtrl, 'Konfirmasi Kata Sandi',
+              () =>
+                  setState(() => _sembunyikanPassword = !_sembunyikanPassword)),
+          _fieldPassword(
+              _konfirmasiCtrl,
+              'Konfirmasi Kata Sandi',
               _sembunyikanKonfirmasi,
-              () => setState(() => _sembunyikanKonfirmasi = !_sembunyikanKonfirmasi)),
+              () => setState(
+                  () => _sembunyikanKonfirmasi = !_sembunyikanKonfirmasi)),
         ]),
 
         const SizedBox(height: 14),
 
         // ── Kartu Data Fisik ───────────────────────────────
         _buildKartuSection('Data Fisik', Icons.straighten_rounded, [
-
           // Tanggal lahir
           GestureDetector(
             onTap: _pilihTanggalLahir,
             child: Container(
               margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
                 color: const Color(0xFFF0F4FF),
                 borderRadius: BorderRadius.circular(12),
@@ -429,8 +515,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   onTap: () => setState(() => _jenisKelamin = jk),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    margin: EdgeInsets.only(
-                        right: jk == 'Laki-laki' ? 8 : 0),
+                    margin: EdgeInsets.only(right: jk == 'Laki-laki' ? 8 : 0),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
                       color: aktif
@@ -451,9 +536,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               ? Icons.male_rounded
                               : Icons.female_rounded,
                           size: 18,
-                          color: aktif
-                              ? Colors.white
-                              : const Color(0xFF5B7DB1),
+                          color: aktif ? Colors.white : const Color(0xFF5B7DB1),
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -461,9 +544,8 @@ class _RegisterPageState extends State<RegisterPage> {
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 13,
-                            color: aktif
-                                ? Colors.white
-                                : const Color(0xFF5B7DB1),
+                            color:
+                                aktif ? Colors.white : const Color(0xFF5B7DB1),
                           ),
                         ),
                       ],
@@ -491,8 +573,7 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
             child: const Text(
               'Lanjutkan →',
-              style: TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w700),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
           ),
         ),
@@ -504,13 +585,11 @@ class _RegisterPageState extends State<RegisterPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text('Sudah punya akun? ',
-                  style: TextStyle(
-                      fontSize: 13, color: Colors.grey.shade600)),
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
               GestureDetector(
                 onTap: () => Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(
-                      builder: (_) => const LoginPage()),
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
                 ),
                 child: const Text(
                   'Masuk',
@@ -541,7 +620,11 @@ class _RegisterPageState extends State<RegisterPage> {
         'singkat': 'Sistem imun menyerang sel pankreas penghasil insulin.',
         'deskripsi':
             'Diabetes Tipe 1 adalah penyakit autoimun di mana sistem kekebalan tubuh menyerang dan menghancurkan sel beta pankreas yang menghasilkan insulin. Penderita harus bergantung pada injeksi insulin seumur hidup. Umumnya muncul pada anak-anak dan remaja.',
-        'ciri': ['Onset cepat', 'Perlu insulin setiap hari', 'Biasa sejak muda'],
+        'ciri': [
+          'Onset cepat',
+          'Perlu insulin setiap hari',
+          'Biasa sejak muda'
+        ],
       },
       {
         'tipe': 'Tipe 2',
@@ -550,16 +633,25 @@ class _RegisterPageState extends State<RegisterPage> {
         'singkat': 'Tubuh tidak menggunakan insulin dengan efektif.',
         'deskripsi':
             'Diabetes Tipe 2 terjadi ketika tubuh tidak dapat menggunakan insulin secara efektif (resistensi insulin) atau pankreas tidak memproduksi cukup insulin. Jenis ini paling umum dan sering berhubungan dengan gaya hidup tidak sehat, obesitas, dan usia.',
-        'ciri': ['Paling umum (90%)', 'Bisa dikontrol gaya hidup', 'Sering pada dewasa'],
+        'ciri': [
+          'Paling umum (90%)',
+          'Bisa dikontrol gaya hidup',
+          'Sering pada dewasa'
+        ],
       },
       {
         'tipe': 'Gestasional',
         'ikon': Icons.pregnant_woman_rounded,
         'warna': const Color(0xFFAB47BC),
-        'singkat': 'Terjadi saat kehamilan, biasanya hilang setelah melahirkan.',
+        'singkat':
+            'Terjadi saat kehamilan, biasanya hilang setelah melahirkan.',
         'deskripsi':
             'Diabetes gestasional berkembang selama kehamilan pada wanita yang sebelumnya tidak menderita diabetes. Kondisi ini terjadi karena perubahan hormon yang membuat sel tubuh lebih sulit merespons insulin. Biasanya sembuh setelah melahirkan, namun meningkatkan risiko Tipe 2 di masa depan.',
-        'ciri': ['Khusus ibu hamil', 'Biasanya sementara', 'Butuh pemantauan ketat'],
+        'ciri': [
+          'Khusus ibu hamil',
+          'Biasanya sementara',
+          'Butuh pemantauan ketat'
+        ],
       },
       {
         'tipe': 'Pra-Diabetes',
@@ -568,7 +660,11 @@ class _RegisterPageState extends State<RegisterPage> {
         'singkat': 'Gula darah tinggi namun belum mencapai batas diabetes.',
         'deskripsi':
             'Pra-diabetes adalah kondisi di mana kadar gula darah lebih tinggi dari normal, tetapi belum cukup tinggi untuk didiagnosis sebagai diabetes Tipe 2. Ini adalah sinyal peringatan. Dengan perubahan gaya hidup yang tepat, kondisi ini dapat dicegah agar tidak berkembang menjadi diabetes.',
-        'ciri': ['Gula darah 100–125 mg/dL', 'Bisa dicegah', 'Perlu gaya hidup sehat'],
+        'ciri': [
+          'Gula darah 100–125 mg/dL',
+          'Bisa dicegah',
+          'Perlu gaya hidup sehat'
+        ],
       },
     ];
 
@@ -617,8 +713,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   )
                 : const Text(
                     'Kirim Kode OTP ke Email →',
-                    style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
           ),
         ),
@@ -629,7 +724,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _kartuTipeDiabetes(Map<String, dynamic> t) {
     final bool selected = _tipeDiabetes == t['tipe'];
-    final Color warna   = t['warna'] as Color;
+    final Color warna = t['warna'] as Color;
 
     return GestureDetector(
       onTap: () => setState(() => _tipeDiabetes = t['tipe']),
@@ -671,8 +766,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     color: warna.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(t['ikon'] as IconData,
-                      color: warna, size: 22),
+                  child: Icon(t['ikon'] as IconData, color: warna, size: 22),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -684,17 +778,14 @@ class _RegisterPageState extends State<RegisterPage> {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color: selected
-                              ? warna
-                              : const Color(0xFF1A2340),
+                          color: selected ? warna : const Color(0xFF1A2340),
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         t['singkat'],
                         style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF78909C)),
+                            fontSize: 12, color: Color(0xFF78909C)),
                       ),
                     ],
                   ),
@@ -706,8 +797,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                        color:
-                            selected ? warna : Colors.grey.shade300,
+                        color: selected ? warna : Colors.grey.shade300,
                         width: 2),
                     color: selected ? warna : Colors.transparent,
                   ),
@@ -738,8 +828,8 @@ class _RegisterPageState extends State<RegisterPage> {
                 runSpacing: 6,
                 children: (t['ciri'] as List<String>).map((c) {
                   return Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: warna.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -809,25 +899,6 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
               ),
             ],
-          ),
-        ),
-
-        // Info simulasi
-        Container(
-          margin: const EdgeInsets.only(top: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF8E1),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFFFE082)),
-          ),
-          child: const Text(
-            '🔑 Demo: gunakan kode  123456',
-            style: TextStyle(
-              fontSize: 12,
-              color: Color(0xFFE65100),
-              fontWeight: FontWeight.w600,
-            ),
           ),
         ),
 
@@ -909,8 +980,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   )
                 : const Text(
                     'Verifikasi & Daftar',
-                    style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
           ),
         ),
@@ -922,8 +992,7 @@ class _RegisterPageState extends State<RegisterPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Text('Tidak menerima kode? ',
-                style: TextStyle(
-                    fontSize: 13, color: Color(0xFF78909C))),
+                style: TextStyle(fontSize: 13, color: Color(0xFF78909C))),
             GestureDetector(
               onTap: _sedangMemuat ? null : _kirimUlangOTP,
               child: const Text(
@@ -1006,19 +1075,17 @@ class _RegisterPageState extends State<RegisterPage> {
         decoration: InputDecoration(
           labelText: label,
           suffixText: suffix,
-          prefixIcon: Icon(ikon,
-              color: const Color(0xFF1A73E8), size: 20),
+          prefixIcon: Icon(ikon, color: const Color(0xFF1A73E8), size: 20),
           filled: true,
-          fillColor: readOnly
-              ? const Color(0xFFF5F7FA)
-              : const Color(0xFFF0F4FF),
+          fillColor:
+              readOnly ? const Color(0xFFF5F7FA) : const Color(0xFFF0F4FF),
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none),
           focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                  color: Color(0xFF1A73E8), width: 1.5)),
+              borderSide:
+                  const BorderSide(color: Color(0xFF1A73E8), width: 1.5)),
         ),
       ),
     );
@@ -1054,10 +1121,10 @@ class _RegisterPageState extends State<RegisterPage> {
               borderSide: BorderSide.none),
           focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                  color: Color(0xFF1A73E8), width: 1.5)),
+              borderSide:
+                  const BorderSide(color: Color(0xFF1A73E8), width: 1.5)),
         ),
       ),
-    ); 
+    );
   }
 }
