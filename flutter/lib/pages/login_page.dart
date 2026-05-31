@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'register_page.dart';
 import 'dashboard_page.dart';
 import '../admin/admin_main_page.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -25,49 +28,98 @@ class _LoginPageState extends State<LoginPage> {
 
   // 🔥 LOGIN DENGAN ROLE
   void _handleLogin() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+  final email = _emailController.text.trim();
+  final password = _passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Email dan kata sandi tidak boleh kosong'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
+  if (email.isEmpty || password.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Email dan kata sandi tidak boleh kosong'),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+    return;
+  }
 
-    setState(() => _sedangMemuat = true);
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() => _sedangMemuat = false);
+  setState(() {
+    _sedangMemuat = true;
+  });
+
+  try {
+    final response = await http.post(
+  Uri.parse('http://localhost:8000/api/login'),
+  headers: {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+  },
+  body: jsonEncode({
+    'email': email,
+    'password': password,
+  }),
+);
+
+print('STATUS CODE: ${response.statusCode}');
+print('BODY: ${response.body}');
+
+    if (response.statusCode != 200) {
+  throw Exception('Login gagal');
+}
+
+final result = jsonDecode(response.body);
+
+    setState(() {
+      _sedangMemuat = false;
+    });
 
     if (!mounted) return;
 
-    // 🔑 ROLE LOGIN
-    if (email == "admin@gmail.com" && password == "123") {
-      // 👉 ADMIN
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const AdminMainPage()),
-      );
-    } else if (email == "user@gmail.com" && password == "123") {
-      // 👉 PASIEN
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const DashboardPage()),
-      );
-    } else {
-      // ❌ LOGIN GAGAL
+    if (result['status'] == true) {
+      final prefs = await SharedPreferences.getInstance();
+
+      await prefs.setString('token', result['token']);
+      await prefs.setString('role', result['user']['role']);
+      await prefs.setString('name', result['user']['name']);
+      await prefs.setString('email', result['user']['email']);
+
+      final role = result['user']['role'];
+
+      if (role == 'admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const AdminMainPage(),
+          ),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const DashboardPage(),
+          ),
+        );
+      }
+    } 
+    else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Email atau password salah'),
+        SnackBar(
+          content: Text(result['message']),
           backgroundColor: Colors.redAccent,
         ),
       );
     }
-  }
+  } catch (e) {
+    setState(() {
+      _sedangMemuat = false;
+    });
 
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+  }
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(

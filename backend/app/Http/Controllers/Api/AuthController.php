@@ -38,6 +38,7 @@ class AuthController extends Controller
         'berat_badan'   => $request->berat_badan,
         'jenis_kelamin' => $request->jenis_kelamin,
         'tipe_diabetes' => $request->tipe_diabetes,
+        'role'          => 'user',
     ]);
 
     $token = $user->createToken('auth_token')->plainTextToken;

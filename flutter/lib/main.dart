@@ -32,7 +32,7 @@ class AplikasiKu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'GlucoGuide - Catatan Makan Diabetes',
+      title: 'food log app',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

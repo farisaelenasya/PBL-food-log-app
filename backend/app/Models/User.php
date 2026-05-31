@@ -29,6 +29,7 @@ class User extends Authenticatable
     'berat_badan',
     'jenis_kelamin',
     'tipe_diabetes',
+    'role',
     ];
 
     /**
