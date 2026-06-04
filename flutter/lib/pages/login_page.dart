@@ -80,7 +80,7 @@ final result = jsonDecode(response.body);
       await prefs.setString('role', result['user']['role']);
       await prefs.setString('name', result['user']['name']);
       await prefs.setString('email', result['user']['email']);
-
+      await prefs.setString('user_name', result['user']['name']);
       final role = result['user']['role'];
 
       if (role == 'admin') {

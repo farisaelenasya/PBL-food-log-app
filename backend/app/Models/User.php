@@ -30,6 +30,9 @@ class User extends Authenticatable
     'jenis_kelamin',
     'tipe_diabetes',
     'role',
+     'no_telepon',     
+    'golongan_darah',
+    'foto_profil',
     ];
 
     /**

@@ -1,8 +1,95 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'edit_profile_page.dart';
+import 'dashboard_page.dart';
+import 'blood_sugar_analysis_page.dart';
+import 'meal_history_page.dart';
+import 'food_photo_input_page.dart';
 
-class HealthProfilePage extends StatelessWidget {
+class HealthProfilePage extends StatefulWidget {
   const HealthProfilePage({super.key});
+
+  @override
+  State<HealthProfilePage> createState() => _HealthProfilePageState();
+}
+
+class _HealthProfilePageState extends State<HealthProfilePage> {
+  Map<String, dynamic>? _user;
+  bool _sedangMemuat = true;
+
+  int _indeksAktif = 4;
+
+  static const String _baseUrl = 'http://localhost:8000/api';
+
+  @override
+  void initState() {
+    super.initState();
+    _muatProfil();
+  }
+
+  Future<void> _muatProfil() async {
+    setState(() => _sedangMemuat = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token') ?? '';
+
+      final res = await http.get(
+        Uri.parse('$_baseUrl/profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        setState(() => _user = data['user']);
+      } else {
+        _snackbar('Gagal memuat profil', Colors.red);
+      }
+    } catch (e) {
+      _snackbar('Gagal terhubung ke server', Colors.red);
+    } finally {
+      setState(() => _sedangMemuat = false);
+    }
+  }
+
+  void _snackbar(String pesan, Color warna) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(pesan),
+      backgroundColor: warna,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      margin: const EdgeInsets.all(12),
+    ));
+  }
+
+  String _formatTanggal(String? tgl) {
+    if (tgl == null || tgl.isEmpty) return '-';
+    try {
+      final dt = DateTime.parse(tgl);
+      const bulan = [
+        '',
+        'Januari',
+        'Februari',
+        'Maret',
+        'April',
+        'Mei',
+        'Juni',
+        'Juli',
+        'Agustus',
+        'September',
+        'Oktober',
+        'November',
+        'Desember'
+      ];
+      return '${dt.day} ${bulan[dt.month]} ${dt.year}';
+    } catch (_) {
+      return tgl;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,75 +98,137 @@ class HealthProfilePage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, size: 18, color: Color(0xFF1A1A2E)),
-          onPressed: () => Navigator.pop(context),
+        automaticallyImplyLeading: false,
+        centerTitle: true,
+        title: const Text(
+          'Profil Kesehatan',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1A1A2E),
+          ),
         ),
-        title: const Text('Profil Kesehatan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Header
-            Container(
-              color: Colors.white,
+      body: _sedangMemuat
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF2979FF),
+              ),
+            )
+          : _user == null
+              ? const Center(
+                  child: Text('Gagal memuat data profil'),
+                )
+              : _buildKonten(),
+      bottomNavigationBar: _buildNavBawah(),
+    );
+  }
+
+  Widget _buildKonten() {
+    final u = _user!;
+    final nama = u['name'] ?? '-';
+    final idPasien = '#${u['id'].toString().padLeft(5, '0')}-HT';
+    final tglLahir = _formatTanggal(u['tanggal_lahir']);
+    final umur = u['umur'] != null ? '${u['umur']} tahun' : '-';
+    final tinggi = u['tinggi_badan'] != null ? '${u['tinggi_badan']} cm' : '-';
+    final berat = u['berat_badan'] != null ? '${u['berat_badan']} kg' : '-';
+    final kelamin = u['jenis_kelamin'] ?? '-';
+    final golDarah = u['golongan_darah'] ?? '-';
+    final email = u['email'] ?? '-';
+    final telepon = u['no_telepon'] ?? '-';
+    final tipeDiabet =
+        u['tipe_diabetes'] != null ? 'Diabetes ${u['tipe_diabetes']}' : '-';
+
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Header
+          Container(
+            color: Colors.white,
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Column(
+              children: [
+                CircleAvatar(
+                 radius: 50,
+                 backgroundColor: Colors.blue[100],
+                 backgroundImage: (_user!['foto_profil'] != null &&
+                   (_user!['foto_profil'] as String).isNotEmpty)
+                    ? NetworkImage(_user!['foto_profil'] as String)
+                      : null,
+                   child: (_user!['foto_profil'] == null ||
+                  (_user!['foto_profil'] as String).isEmpty)
+      ? const Icon(Icons.person,
+          size: 50, color: Color(0xFF2979FF))
+      : null,
+),
+                const SizedBox(height: 20),
+                Text(nama,
+                    style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A2E))),
+                const SizedBox(height: 4),
+                Text('ID Pasien: $idPasien',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[500])),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          _buildSeksi('Data Dasar', [
+            _bariInfo(Icons.person_outline, 'Nama Lengkap', nama),
+            _bariInfo(Icons.cake_outlined, 'Tanggal Lahir', '$tglLahir\n$umur'),
+            _bariInfo(Icons.wc, 'Jenis Kelamin', '$kelamin\nBiologis'),
+          ]),
+          const SizedBox(height: 12),
+
+          _buildSeksi('Informasi Medis', [
+            _bariMedis(Icons.bloodtype_outlined, Colors.red, 'Golongan Darah',
+                golDarah, 'Penting untuk keadaan darurat'),
+            _bariInfo(Icons.monitor_heart_outlined, 'Tanda Vital',
+                '$tinggi    $berat'),
+            _bariInfo(Icons.water_drop_rounded, 'Tipe Diabetes', tipeDiabet),
+          ]),
+          const SizedBox(height: 12),
+
+          _buildSeksi('Informasi Kontak', [
+            _bariInfo(
+                Icons.email_outlined, 'Alamat Email', '$email\nKontak utama'),
+            _bariInfo(
+                Icons.phone_outlined, 'Nomor Telepon', '$telepon\nHandphone'),
+          ]),
+          const SizedBox(height: 24),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: SizedBox(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.blue[100],
-                    child: const Icon(Icons.person, size: 55, color: Color(0xFF2979FF)),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text('Alex Thompson', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
-                  const SizedBox(height: 4),
-                  Text('ID Pasien: #98210-HT', style: TextStyle(fontSize: 13, color: Colors.grey[500])),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            _buildSeksi('Data Dasar', [
-              _bariInfo(Icons.person_outline, 'Nama Lengkap', 'Alex Thompson'),
-              _bariInfo(Icons.cake_outlined, 'Tanggal Lahir', '14 Oktober 1991\n32 tahun'),
-              _bariInfo(Icons.wc, 'Jenis Kelamin', 'Laki-laki\nBiologis'),
-            ]),
-            const SizedBox(height: 12),
-
-            _buildSeksi('Informasi Medis', [
-              _bariMedis(Icons.bloodtype_outlined, Colors.red, 'Golongan Darah', 'O Positif (O+)', 'Penting untuk keadaan darurat'),
-              _bariInfo(Icons.monitor_heart_outlined, 'Tanda Vital', '182 cm    78 kg\nDiperbarui 2 hari lalu'),
-            ]),
-            const SizedBox(height: 12),
-
-            _buildSeksi('Informasi Kontak', [
-              _bariInfo(Icons.email_outlined, 'Alamat Email', 'alex.t@example.com\nKontak utama'),
-              _bariInfo(Icons.phone_outlined, 'Nomor Telepon', '+62 812-3456-7890\nHandphone'),
-              _bariKontakDarurat(),
-            ]),
-            const SizedBox(height: 24),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2979FF), foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0,
-                  ),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfilePage())),
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const Text('Ubah Informasi Profil', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2979FF),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
                 ),
+                onPressed: () async {
+                  final diperbarui = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(builder: (_) => const EditProfilePage()),
+                  );
+                  if (diperbarui == true) _muatProfil();
+                },
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Ubah Informasi Profil',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
-            const SizedBox(height: 24),
-          ],
-        ),
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
@@ -91,7 +240,11 @@ class HealthProfilePage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(judul, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
+          Text(judul,
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A1A2E))),
           const SizedBox(height: 12),
           ...baris,
         ],
@@ -111,9 +264,12 @@ class HealthProfilePage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                Text(label,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500])),
                 const SizedBox(height: 2),
-                Text(nilai, style: const TextStyle(fontSize: 14, color: Color(0xFF1A1A2E), height: 1.4)),
+                Text(nilai,
+                    style: const TextStyle(
+                        fontSize: 14, color: Color(0xFF1A1A2E), height: 1.4)),
               ],
             ),
           ),
@@ -122,7 +278,8 @@ class HealthProfilePage extends StatelessWidget {
     );
   }
 
-  static Widget _bariMedis(IconData ikon, Color warnaIkon, String label, String nilai, String sub) {
+  static Widget _bariMedis(
+      IconData ikon, Color warnaIkon, String label, String nilai, String sub) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -134,16 +291,26 @@ class HealthProfilePage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                Text(label,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500])),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Text(nilai, style: const TextStyle(fontSize: 14, color: Color(0xFF1A1A2E), fontWeight: FontWeight.w600)),
+                    Text(nilai,
+                        style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF1A1A2E),
+                            fontWeight: FontWeight.w600)),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(color: const Color(0xFFFFEBEE), borderRadius: BorderRadius.circular(6)),
-                      child: Text(sub, style: const TextStyle(fontSize: 10, color: Colors.red)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFFFEBEE),
+                          borderRadius: BorderRadius.circular(6)),
+                      child: Text(sub,
+                          style:
+                              const TextStyle(fontSize: 10, color: Colors.red)),
                     ),
                   ],
                 ),
@@ -155,29 +322,90 @@ class HealthProfilePage extends StatelessWidget {
     );
   }
 
-  static Widget _bariKontakDarurat() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+  Widget _buildNavBawah() {
+    final daftarMenu = [
+      {'ikon': Icons.home_rounded, 'label': 'Beranda'},
+      {'ikon': Icons.bar_chart_rounded, 'label': 'Laporan'},
+      {'ikon': null, 'label': 'Tambah'},
+      {'ikon': Icons.history_rounded, 'label': 'Riwayat'},
+      {'ikon': Icons.person_outline_rounded, 'label': 'Profil'},
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.07),
+              blurRadius: 20,
+              offset: const Offset(0, -4))
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
-        children: [
-          const Icon(Icons.emergency_outlined, size: 20, color: Color(0xFF2979FF)),
-          const SizedBox(width: 14),
-          Expanded(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: List.generate(daftarMenu.length, (i) {
+          if (i == 2) {
+            return GestureDetector(
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const FoodPhotoInputPage())),
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF2979FF),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                        color: Color(0x442979FF),
+                        blurRadius: 12,
+                        offset: Offset(0, 4))
+                  ],
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 28),
+              ),
+            );
+          }
+
+          final aktif = _indeksAktif == i;
+
+          final List<Widget?> halamanTujuan = [
+            const DashboardPage(),
+            const BloodSugarAnalysisPage(),
+            null,
+            const MealHistoryPage(),
+            const HealthProfilePage()
+          ];
+
+          return GestureDetector(
+            onTap: () {
+              setState(() => _indeksAktif = i);
+
+              if (halamanTujuan[i] != null) {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => halamanTujuan[i]!));
+              }
+            },
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Kontak Darurat', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-                const SizedBox(height: 2),
-                const Text('Sarah Thompson (Istri)', style: TextStyle(fontSize: 14, color: Color(0xFF1A1A2E))),
+                Icon(daftarMenu[i]['ikon'] as IconData,
+                    color: aktif ? const Color(0xFF2979FF) : Colors.grey[400],
+                    size: 24),
+                const SizedBox(height: 3),
+                Text(daftarMenu[i]['label'] as String,
+                    style: TextStyle(
+                        fontSize: 10,
+                        color:
+                            aktif ? const Color(0xFF2979FF) : Colors.grey[400],
+                        fontWeight:
+                            aktif ? FontWeight.w600 : FontWeight.normal)),
               ],
             ),
-          ),
-          TextButton(
-            onPressed: () {},
-            style: TextButton.styleFrom(foregroundColor: const Color(0xFF2979FF)),
-            child: const Text('Hubungi', style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        ],
+          );
+        }),
       ),
     );
   }

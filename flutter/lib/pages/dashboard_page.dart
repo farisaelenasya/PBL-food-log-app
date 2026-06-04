@@ -14,6 +14,7 @@ import 'insulin_tracker_page.dart';
 import 'notifikasi_page.dart';
 import 'manual_food_log_page.dart';
 import 'artikel_edukasi_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -25,11 +26,46 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _indeksAktif = 0;
   int _indeksTips = 0;
+  String _namaUser = '';     
+String _hariTanggal = ''; 
+String? _fotoProfilUrl;
+
   final PageController _tipsController = PageController();
   final List<double> _dataGlukosa = [90, 105, 98, 115, 108, 120, 110];
 
   final _glucoseStore = GlucoseStore();
+@override
+void initState() {
+  super.initState();
+  _muatUser();
+  _formatHariTanggal();
+}
 
+Future<void> _muatUser() async {
+  final prefs = await SharedPreferences.getInstance();
+  final nama = prefs.getString('user_name') ?? '';
+  final foto = prefs.getString('foto_profil');
+  setState(() {
+    _namaUser      = nama.isNotEmpty ? nama : 'Pengguna';
+    _fotoProfilUrl = foto; 
+  });
+}
+
+void _formatHariTanggal() {
+  const daftarHari = ['', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+  const daftarBulan = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  final now = DateTime.now();
+  setState(() => _hariTanggal =
+    '${daftarHari[now.weekday]}, ${now.day} ${daftarBulan[now.month]}');
+}
+String _sapaanWaktu() {
+  final jam = DateTime.now().hour;
+  final sapaan = jam < 11 ? 'Selamat pagi'
+      : jam < 15 ? 'Selamat siang'
+      : jam < 19 ? 'Selamat sore'
+      : 'Selamat malam';
+  return '$sapaan, $_namaUser';
+}
   // Ambil kondisi gula darah terbaru
   _KondisiGula get _kondisiGula {
     final entri = _glucoseStore.semuaEntri;
@@ -237,19 +273,27 @@ class _DashboardPageState extends State<DashboardPage> {
           Row(
             children: [
               GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfilePage())),
+                onTap: () async {
+                  await Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfilePage()));
+                  _muatUser(); // reload nama setelah edit profil
+                },
                 child: CircleAvatar(
-                  radius: 22,
-                  backgroundColor: Colors.blue[100],
-                  child: const Icon(Icons.person, color: Color(0xFF2979FF), size: 24),
-                ),
+  radius: 22,
+  backgroundColor: Colors.blue[100],
+  backgroundImage: _fotoProfilUrl != null && _fotoProfilUrl!.isNotEmpty
+      ? NetworkImage(_fotoProfilUrl!)
+      : null,
+  child: (_fotoProfilUrl == null || _fotoProfilUrl!.isEmpty)
+      ? const Icon(Icons.person, color: Color(0xFF2979FF), size: 24)
+      : null,
+),
               ),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Senin, 24 Okt', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-                  const Text('Selamat pagi, Alex', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
+                 Text(_hariTanggal, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                 Text(_sapaanWaktu(), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
                 ],
               ),
             ],
