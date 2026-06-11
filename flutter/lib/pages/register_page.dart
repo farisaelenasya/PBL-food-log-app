@@ -94,10 +94,14 @@ class _RegisterPageState extends State<RegisterPage> {
   setState(() => _sedangMemuat = true);
   try {
     final response = await http.post(
-      Uri.parse('http://localhost:8000/api/kirim-otp'),
+      Uri.parse('http://10.0.2.2:8000/api/kirim-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': _emailCtrl.text.trim()}),
     );
+    
+    print('STATUS: ${response.statusCode}');
+    print('BODY: ${response.body}');
+
     final data = jsonDecode(response.body);
     if (response.statusCode == 200 && data['status'] == true) {
       setState(() {
@@ -129,7 +133,7 @@ class _RegisterPageState extends State<RegisterPage> {
   try {
     // Verifikasi OTP dulu
     final otpRes = await http.post(
-      Uri.parse('http://localhost:8000/api/verifikasi-otp'),
+      Uri.parse('http://10.0.2.2:8000/api/verifikasi-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'email': _emailCtrl.text.trim(),
@@ -150,7 +154,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     // OTP valid → register ke API
     final regRes = await http.post(
-      Uri.parse('http://localhost:8000/api/register'),
+      Uri.parse('http://10.0.2.2:8000/api/register'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'name'          : _namaCtrl.text.trim(),
@@ -202,7 +206,7 @@ class _RegisterPageState extends State<RegisterPage> {
   setState(() => _sedangMemuat = true);
   try {
     final response = await http.post(
-      Uri.parse('http://localhost:8000/api/kirim-otp'),
+      Uri.parse('http://10.0.2.2:8000/api/kirim-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': _emailCtrl.text.trim()}),
     );

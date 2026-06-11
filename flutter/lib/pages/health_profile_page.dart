@@ -21,7 +21,7 @@ class _HealthProfilePageState extends State<HealthProfilePage> {
 
   int _indeksAktif = 4;
 
-  static const String _baseUrl = 'http://localhost:8000/api';
+  static const String _baseUrl = 'http://10.0.2.2:8000/api';
 
   @override
   void initState() {

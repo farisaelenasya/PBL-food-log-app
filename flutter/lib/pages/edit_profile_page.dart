@@ -28,7 +28,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String? _fotoNamaFile;
   final _imagePicker           = ImagePicker();
 
-  static const String _baseUrl = 'http://localhost:8000/api';
+  static const String _baseUrl = 'http://10.0.2.2:8000/api';
 
   final List<String> _daftarDiabetes = [
     'Diabetes Tipe 1',

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/glucose_entry.dart';
 import '../models/glucose_store.dart';
 import 'glucose_history_page.dart';
+import '../services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AddGlucosePage extends StatefulWidget {
   const AddGlucosePage({super.key});
@@ -17,6 +19,7 @@ class _AddGlucosePageState extends State<AddGlucosePage> {
   TimeOfDay _waktuDipilih = TimeOfDay.now();
   int _indeksKonteks = 0;
   bool _sedangMenyimpan = false;
+  String _namaUser = 'Pasien'; 
 
   final List<String> _daftarKonteks = [
     'Sebelum Sarapan',
@@ -35,6 +38,19 @@ class _AddGlucosePageState extends State<AddGlucosePage> {
     _catatanController.dispose();
     super.dispose();
   }
+
+  @override
+void initState() {
+  super.initState();
+  _muatNamaUser();
+}
+
+Future<void> _muatNamaUser() async {
+  final prefs = await SharedPreferences.getInstance();
+  setState(() {
+    _namaUser = prefs.getString('user_name') ?? 'Pasien';
+  });
+}
 
   Future<void> _pilihTanggal() async {
     final picked = await showDatePicker(
@@ -78,10 +94,17 @@ class _AddGlucosePageState extends State<AddGlucosePage> {
     setState(() => _sedangMenyimpan = true);
     await Future.delayed(const Duration(milliseconds: 600));
 
-    final waktuLengkap = DateTime(
-      _tanggalDipilih.year, _tanggalDipilih.month, _tanggalDipilih.day,
-      _waktuDipilih.hour, _waktuDipilih.minute,
-    );
+// Kirim ke backend Laravel
+  final berhasil = await ApiService.simpanGlukosa(
+    patientName: _namaUser,
+    glucoseLevel: nilai.toInt(),
+  );
+
+   // Simpan juga ke local store
+  final waktuLengkap = DateTime(
+    _tanggalDipilih.year, _tanggalDipilih.month, _tanggalDipilih.day,
+    _waktuDipilih.hour, _waktuDipilih.minute,
+  );
 
     GlucoseStore().tambah(GlucoseEntry(
       nilai: nilai,
@@ -91,12 +114,15 @@ class _AddGlucosePageState extends State<AddGlucosePage> {
     ));
 
     setState(() => _sedangMenyimpan = false);
-
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Data gula darah berhasil disimpan!'), backgroundColor: Color(0xFF2979FF)),
-    );
 
+    ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(berhasil ? 'Data berhasil disimpan!' : 'Tersimpan lokal (offline)'),
+      backgroundColor: berhasil ? const Color(0xFF2979FF) : Colors.orange,
+    ),
+  );
+  
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const GlucoseHistoryPage()),
@@ -156,7 +182,7 @@ class _AddGlucosePageState extends State<AddGlucosePage> {
                 children: [
                   Text(
                     'Kadar Gula Darah',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500], fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -171,7 +197,7 @@ class _AddGlucosePageState extends State<AddGlucosePage> {
                           style: TextStyle(
                             fontSize: 64,
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey[300],
+                            color: Colors.black87,
                           ),
                           decoration: const InputDecoration(
                             border: InputBorder.none,
@@ -218,7 +244,7 @@ class _AddGlucosePageState extends State<AddGlucosePage> {
                             children: [
                               Text(_formatTanggal(_tanggalDipilih),
                                 style: const TextStyle(fontSize: 14, color: Color(0xFF1A1A2E))),
-                              const Icon(Icons.calendar_today_outlined, size: 18, color: Colors.grey),
+                              const Icon(Icons.calendar_today_outlined, size: 18, color: Colors.black87),
                             ],
                           ),
                         ),
@@ -277,7 +303,7 @@ class _AddGlucosePageState extends State<AddGlucosePage> {
                       color: dipilih ? const Color(0xFF2979FF) : Colors.white,
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(
-                        color: dipilih ? const Color(0xFF2979FF) : Colors.grey[300]!,
+                        color: dipilih ? const Color(0xFF2979FF) : Colors.black87,
                       ),
                       boxShadow: dipilih
                           ? [const BoxShadow(color: Color(0x332979FF), blurRadius: 8, offset: Offset(0, 3))]
@@ -288,7 +314,7 @@ class _AddGlucosePageState extends State<AddGlucosePage> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: dipilih ? FontWeight.bold : FontWeight.normal,
-                        color: dipilih ? Colors.white : Colors.grey[700],
+                        color: dipilih ? Colors.white : Colors.black87,
                       ),
                     ),
                   ),
@@ -312,7 +338,7 @@ class _AddGlucosePageState extends State<AddGlucosePage> {
                 maxLines: 4,
                 decoration: InputDecoration(
                   hintText: 'Contoh: Merasa sedikit pusing, makan semangkuk besar buah...',
-                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                  hintStyle: TextStyle(color: Colors.black87, fontSize: 13),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide.none,

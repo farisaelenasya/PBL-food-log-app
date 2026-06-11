@@ -22,21 +22,21 @@ final List<Artikel> daftarArtikel = [
   Artikel(
     judul: 'Apa itu Diabetes?',
     isi: 'Diabetes adalah kondisi ketika kadar gula dalam darah terlalu tinggi karena tubuh tidak memproduksi insulin dengan baik.',
-    gambar: 'https://images.unsplash.com/photo-1588776814546-ec7e2c9d4a0f',
+    gambar: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600&q=80',
   ),
   Artikel(
     judul: 'Pentingnya Cek Gula Darah',
     isi: 'Memantau gula darah secara rutin membantu mencegah komplikasi serius seperti penyakit jantung dan ginjal.',
-    gambar: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d',
+    gambar: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&q=80',
   ),
   Artikel(
     judul: 'Tips Pola Makan Sehat',
     isi: 'Konsumsi makanan tinggi serat, hindari gula berlebih, dan atur porsi makan secara seimbang.',
-    gambar: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061',
+    gambar: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&q=80',
   ),
   Artikel(
     judul: 'Manfaat Olahraga',
     isi: 'Olahraga membantu tubuh menggunakan insulin lebih efektif dan menurunkan kadar gula darah.',
-    gambar: 'https://images.unsplash.com/photo-1554284126-aa88f22d8b74',
+    gambar: 'https://images.unsplash.com/photo-1554284126-aa88f22d8b74?w=600&q=80',
   ),
 ];

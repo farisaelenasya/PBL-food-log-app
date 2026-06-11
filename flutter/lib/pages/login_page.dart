@@ -47,7 +47,7 @@ class _LoginPageState extends State<LoginPage> {
 
   try {
     final response = await http.post(
-  Uri.parse('http://localhost:8000/api/login'),
+  Uri.parse('http://10.0.2.2:8000/api/login'),
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
@@ -148,17 +148,12 @@ final result = jsonDecode(response.body);
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Catatan Makan Diabetes',
+                      'Selamat Datang di Food Log App',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1A1A1A),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Pantau makanan & gula darah Anda',
-                      style: TextStyle(fontSize: 13, color: Colors.grey),
                     ),
                   ],
                 ),

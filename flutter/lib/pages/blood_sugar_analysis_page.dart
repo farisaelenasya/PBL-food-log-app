@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
-import '../models/glucose_store.dart';
+import '../services/api_service.dart';
+import 'dashboard_page.dart';
+import 'meal_history_page.dart';
+import 'health_profile_page.dart';
+import 'food_photo_input_page.dart';
 
 class BloodSugarAnalysisPage extends StatefulWidget {
   const BloodSugarAnalysisPage({super.key});
@@ -10,26 +14,152 @@ class BloodSugarAnalysisPage extends StatefulWidget {
 }
 
 class _BloodSugarAnalysisPageState extends State<BloodSugarAnalysisPage> {
-  int _tabAktif = 1; // 0=Hari, 1=Minggu, 2=Bulan
+  int _tabAktif = 1;
+  int _indeksNavbar = 1; 
   final List<String> _daftarTab = ['Hari', 'Minggu', 'Bulan'];
 
   // Data gula darah per hari (SEN-MIN)
-  final _store = GlucoseStore();
-  List<double> get _dataMingguan => _store.data7Hari.isNotEmpty ? _store.data7Hari : [88, 102, 97, 142, 118, 125, 131];
-  final List<String> _labelHari = ['SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB', 'MIN'];
+  List<Map<String, dynamic>> _semuaData = [];
+bool _isLoading = true;
 
-  final List<Map<String, dynamic>> _riwayat = [
-    {'nilai': 115, 'waktu': 'Hari ini, 08:00', 'keterangan': 'Sebelum Sarapan', 'warna': const Color(0xFF2979FF)},
-    {'nilai': 142, 'waktu': 'Kemarin, 20:30', 'keterangan': 'Setelah Makan Malam', 'warna': const Color(0xFFFF8C00)},
-    {'nilai': 98, 'waktu': 'Kemarin, 07:00', 'keterangan': 'Sebelum Sarapan', 'warna': const Color(0xFF2979FF)},
-    {'nilai': 125, 'waktu': 'Selasa, 13:00', 'keterangan': 'Setelah Makan Siang', 'warna': const Color(0xFFFF8C00)},
-  ];
+List<double> get _dataMingguan {
+  final now = DateTime.now();
+  return List.generate(4, (i) {
+    final mingguKe = i + 1;
+    final entries = _semuaData.where((r) {
+      final tgl = DateTime.parse(r['created_at']).toLocal();
+      if (tgl.year != now.year || tgl.month != now.month) return false;
+      final hariKe = tgl.day;
+      if (mingguKe == 1) return hariKe <= 7;
+      if (mingguKe == 2) return hariKe >= 8 && hariKe <= 14;
+      if (mingguKe == 3) return hariKe >= 15 && hariKe <= 21;
+      return hariKe >= 22;
+    }).toList();
+    if (entries.isEmpty) return -1.0;
+    final total = entries.fold<double>(0, (sum, r) => sum + (r['glucose_level'] as num).toDouble());
+    return total / entries.length;
+  });
+}
 
-  double get _rataRata => _dataMingguan.reduce((a, b) => a + b) / _dataMingguan.length;
-  double get _tertinggi => _dataMingguan.reduce(max);
-  double get _terendah => _dataMingguan.reduce(min);
-  int get _indeksTertinggi => _dataMingguan.indexOf(_tertinggi);
-  int get _indeksTerendah => _dataMingguan.indexOf(_terendah);
+// === DATA BULANAN: rata-rata per bulan tahun ini ===
+List<double> get _dataBulanan {
+  final now = DateTime.now();
+  return List.generate(12, (i) {
+    final bulan = i + 1;
+    final entries = _semuaData.where((r) {
+      final tgl = DateTime.parse(r['created_at']);
+      return tgl.year == now.year && tgl.month == bulan;
+    }).toList();
+    if (entries.isEmpty) return -1.0;
+    final total = entries.fold<double>(0, (sum, r) => sum + (r['glucose_level'] as num).toDouble());
+    return total / entries.length;
+  });
+}
+
+
+List<String> get _labelHari {
+  if (_tabAktif == 1) return ['Mgu 1', 'Mgu 2', 'Mgu 3', 'Mgu 4'];
+  if (_tabAktif == 2) return ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+  final now = DateTime.now();
+ final entries = _semuaData.where((r) {
+  final tgl = DateTime.parse(r['created_at']); 
+  final tglLokal = tgl.toLocal();
+  return tglLokal.year == now.year && tglLokal.month == now.month && tglLokal.day == now.day;
+}).toList();
+  return entries.map((r) {
+  final tgl = DateTime.parse(r['created_at']).toLocal();
+  return '${tgl.hour.toString().padLeft(2, '0')}:${tgl.minute.toString().padLeft(2, '0')}';
+}).toList();
+}
+
+  List<Map<String, dynamic>> get _riwayat {
+  final now = DateTime.now();
+  return _semuaData.where((r) {
+    final tgl = DateTime.parse(r['created_at']).toLocal();
+    if (_tabAktif == 0) {
+      return tgl.year == now.year && tgl.month == now.month && tgl.day == now.day;
+    } else if (_tabAktif == 1) {
+      return now.difference(tgl).inDays <= 7;
+    } else {
+      return tgl.year == now.year;
+    }
+  }).toList();
+}
+
+List<double> get _dataHarian {
+  final now = DateTime.now();
+  final entries = _semuaData.where((r) {
+  final tgl = DateTime.parse(r['created_at']); // ← tambah ini
+  final tglLokal = tgl.toLocal();
+  return tglLokal.year == now.year && tglLokal.month == now.month && tglLokal.day == now.day;
+}).toList();
+  return entries.map((r) => (r['glucose_level'] as num).toDouble()).toList();
+}
+
+List<double> get _dataAktif {
+  if (_tabAktif == 0) return _dataHarian;
+  if (_tabAktif == 1) return _dataMingguan;
+  if (_tabAktif == 2) return _dataBulanan;
+  return [];
+}
+
+  List<double> get _dataValid => _dataAktif.where((v) => v > 0).toList();
+double get _rataRata => _dataValid.isEmpty ? 0 : _dataValid.reduce((a, b) => a + b) / _dataValid.length;
+double get _tertinggi => _dataValid.isEmpty ? 0 : _dataValid.reduce(max);
+double get _terendah => _dataValid.isEmpty ? 0 : _dataValid.reduce(min);
+int get _indeksTertinggi => _dataValid.isEmpty ? 0 : _dataAktif.indexOf(_tertinggi).clamp(0, _dataAktif.length - 1);
+int get _indeksTerendah => _dataValid.isEmpty ? 0 : _dataAktif.indexOf(_terendah).clamp(0, _dataAktif.length - 1);// Persentase data dalam rentang normal (70-140 mg/dL)
+double get _persenDalamRentang {
+  if (_dataValid.isEmpty) return 0;
+  final dalamRentang = _dataValid.where((v) => v >= 70 && v <= 180).length;
+  return (dalamRentang / _dataValid.length) * 100;
+}
+
+// Standar deviasi sebagai ukuran variasi
+double get _variasiGlukosa {
+  if (_dataValid.length < 2) return 0;
+  final mean = _rataRata;
+  final variance = _dataValid.map((v) => (v - mean) * (v - mean)).reduce((a, b) => a + b) / _dataValid.length;
+  return sqrt(variance);
+}
+
+String get _statusRataRata {
+  if (_rataRata == 0) return 'TIDAK ADA DATA';
+  if (_rataRata < 70) return 'RENDAH';
+  if (_rataRata <= 140) return 'NORMAL';
+  if (_rataRata <= 180) return 'TINGGI';
+  return 'SANGAT TINGGI';
+}
+
+Color get _warnaStatusRataRata {
+  if (_rataRata == 0) return Colors.grey;
+  if (_rataRata < 70) return Colors.orange;
+  if (_rataRata <= 140) return Colors.green;
+  if (_rataRata <= 180) return const Color(0xFFFF8C00);
+  return Colors.red;
+}
+
+Color get _warnaLatarStatusRataRata {
+  if (_rataRata == 0) return Colors.grey.shade100;
+  if (_rataRata < 70) return const Color(0xFFFFF3E0);
+  if (_rataRata <= 140) return const Color(0xFFE8F5E9);
+  if (_rataRata <= 180) return const Color(0xFFFFF8E1);
+  return const Color(0xFFFFEBEE);
+}
+
+@override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final data = await ApiService.ambilSemuaData();
+    setState(() {
+      _semuaData = data;
+      _isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,9 +182,11 @@ class _BloodSugarAnalysisPageState extends State<BloodSugarAnalysisPage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
+      body: Stack(
+      children: [
+      SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8),
@@ -69,8 +201,17 @@ class _BloodSugarAnalysisPageState extends State<BloodSugarAnalysisPage> {
           ],
         ),
       ),
-    );
-  }
+
+    Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: _buildNavBawah(),
+    ),
+  ],
+),
+);
+}
 
   Widget _buildTabPeriode() {
     return Container(
@@ -126,14 +267,33 @@ class _BloodSugarAnalysisPageState extends State<BloodSugarAnalysisPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Rata-rata Minggu Ini', style: TextStyle(fontSize: 13, color: Colors.grey[500], fontWeight: FontWeight.w500)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(8)),
-                child: const Text('NORMAL', style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-              ),
-            ],
+            Flexible(
+            child: Text(
+              _tabAktif == 0 ? 'Rata-rata Hari Ini'
+              : _tabAktif == 1 ? 'Rata-rata Minggu Ini'
+              : 'Rata-rata Bulan Ini',
+            style: TextStyle(fontSize: 13, color: Colors.grey[500], fontWeight: FontWeight.w500),
+      ),
+    ),
+
+            Container(
+               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+               decoration: BoxDecoration(
+               color: _warnaLatarStatusRataRata,
+               borderRadius: BorderRadius.circular(8),
+            ),
+               child: Text(
+               _statusRataRata,
+               style: TextStyle(
+                fontSize: 11,
+               color: _warnaStatusRataRata,
+               fontWeight: FontWeight.bold,
+               letterSpacing: 0.5,
+            ),
           ),
+         ),
+       ],
+     ),
           const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -152,26 +312,33 @@ class _BloodSugarAnalysisPageState extends State<BloodSugarAnalysisPage> {
           const SizedBox(height: 16),
           SizedBox(
             height: 180,
-            child: _GrafikGaris(
-              data: _dataMingguan,
-              labelHari: _labelHari,
-              indeksAktif: 3, // KAM
-            ),
+            child: _isLoading
+             ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+             : _dataValid.isEmpty
+              ? const Center(child: Text('Belum ada data', style: TextStyle(color: Colors.grey)))
+             : _GrafikGaris(
+            data: _dataAktif.map((v) => v < 0 ? 0.0 : v).toList(),
+            labelHari: _labelHari,
+            indeksAktif: (_dataAktif.length - 1).clamp(0, _dataAktif.length - 1),
+          ),
           ),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: _labelHari.asMap().entries.map((e) {
-              final aktif = e.key == 3;
-              return Text(
-                e.value,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: aktif ? FontWeight.bold : FontWeight.normal,
-                  color: aktif ? const Color(0xFF2979FF) : Colors.grey[400],
-                ),
-              );
-            }).toList(),
+            final aktif = e.key == _dataAktif.lastIndexWhere((v) => v > 0);
+            return Expanded(
+              child: Text(
+                  e.value,
+                 textAlign: TextAlign.center,
+                 style: TextStyle(
+            fontSize: _tabAktif == 2 ? 9 : 11,
+            fontWeight: aktif ? FontWeight.bold : FontWeight.normal,
+            color: aktif ? const Color(0xFF2979FF) : Colors.grey[400],
+        ),
+      ),
+    );
+  }).toList(),
           ),
         ],
       ),
@@ -191,30 +358,30 @@ class _BloodSugarAnalysisPageState extends State<BloodSugarAnalysisPage> {
           ikon: Icons.trending_up,
           warnaIkon: const Color(0xFF2979FF),
           label: 'TERTINGGI',
-          nilai: '${_tertinggi.toInt()} mg/dL',
-          subjudul: '${_labelHari[_indeksTertinggi].toLowerCase().capitalize()}, 14:00',
+          nilai: _dataValid.isEmpty ? '-' : '${_tertinggi.toInt()} mg/dL',
+          subjudul: _labelHari.isEmpty || _indeksTertinggi < 0 || _indeksTertinggi >= _labelHari.length ? '-' : '${_labelHari[_indeksTertinggi].toLowerCase().capitalize()}',
         ),
         _buildKartuStat(
           ikon: Icons.trending_down,
           warnaIkon: const Color(0xFFFF8C00),
           label: 'TERENDAH',
-          nilai: '${_terendah.toInt()} mg/dL',
-          subjudul: '${_labelHari[_indeksTerendah].toLowerCase().capitalize()}, 06:30',
+          nilai: _dataValid.isEmpty ? '-' : '${_terendah.toInt()} mg/dL',
+          subjudul: _labelHari.isEmpty || _indeksTerendah < 0 || _indeksTerendah >= _labelHari.length ? '-' : '${_labelHari[_indeksTerendah].toLowerCase().capitalize()}',
         ),
         _buildKartuStat(
           ikon: Icons.check_circle,
           warnaIkon: Colors.green,
           label: 'DALAM RENTANG',
-          nilai: '92%',
-          subjudul: 'Stabil',
+          nilai: '${_persenDalamRentang.toStringAsFixed(0)}%',
+          subjudul: _persenDalamRentang >= 70 ? 'Stabil' : 'Perlu Perhatian',
           warnaLatar: const Color(0xFFF0FFF4),
         ),
         _buildKartuStat(
           ikon: Icons.history,
           warnaIkon: Colors.teal,
           label: 'VARIASI',
-          nilai: '+/- 12',
-          subjudul: 'Rendah',
+          nilai: '+/- ${_variasiGlukosa.toStringAsFixed(0)}',
+          subjudul: _variasiGlukosa < 15 ? 'Rendah' : _variasiGlukosa < 30 ? 'Sedang' : 'Tinggi',
         ),
       ],
     );
@@ -274,8 +441,25 @@ class _BloodSugarAnalysisPageState extends State<BloodSugarAnalysisPage> {
   }
 
   Widget _buildItemRiwayat(Map<String, dynamic> r) {
-    final int nilai = r['nilai'];
-    final Color warnaIkon = r['warna'];
+    final double nilai = (r['glucose_level'] as num).toDouble();
+    final waktu = DateTime.parse(r['created_at']).toLocal();
+    final Color warnaIkon = nilai < 70
+        ? const Color(0xFFFF6B35)
+        : nilai <= 140
+            ? const Color(0xFF2979FF)
+            : const Color(0xFFFF8C00);
+
+    final now = DateTime.now();
+    final diff = now.difference(waktu);
+    String waktuLabel;
+    if (diff.inHours < 24 && waktu.day == now.day) {
+      waktuLabel = 'Hari ini, ${waktu.hour.toString().padLeft(2,'0')}:${waktu.minute.toString().padLeft(2,'0')}';
+    } else if (diff.inDays == 1) {
+      waktuLabel = 'Kemarin, ${waktu.hour.toString().padLeft(2,'0')}:${waktu.minute.toString().padLeft(2,'0')}';
+    } else {
+      waktuLabel = '${waktu.day}/${waktu.month}/${waktu.year}';
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -294,14 +478,102 @@ class _BloodSugarAnalysisPageState extends State<BloodSugarAnalysisPage> {
           child: Icon(Icons.water_drop, color: warnaIkon, size: 22),
         ),
         title: Text(
-          '$nilai mg/dL',
+          '${nilai.toInt()} mg/dL',
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E)),
         ),
         subtitle: Text(
-          '${r['waktu']} • ${r['keterangan']}',
+          '$waktuLabel • ${r['patient_name'] ?? '-'}',
           style: TextStyle(fontSize: 12, color: Colors.grey[500]),
         ),
         trailing: Icon(Icons.chevron_right, color: Colors.grey[300]),
+     ),
+    );
+  }
+
+  Widget _buildNavBawah() {
+    final daftarMenu = [
+      {'ikon': Icons.home_rounded, 'label': 'Beranda'},
+      {'ikon': Icons.bar_chart_rounded, 'label': 'Laporan'},
+      {'ikon': null, 'label': 'Tambah'},
+      {'ikon': Icons.history_rounded, 'label': 'Riwayat'},
+      {'ikon': Icons.person_outline_rounded, 'label': 'Profil'},
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.07),
+              blurRadius: 20,
+              offset: const Offset(0, -4))
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: List.generate(daftarMenu.length, (i) {
+          if (i == 2) {
+            return GestureDetector(
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const FoodPhotoInputPage())),
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF2979FF),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                        color: Color(0x442979FF),
+                        blurRadius: 12,
+                        offset: Offset(0, 4))
+                  ],
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 28),
+              ),
+            );
+          }
+
+          final aktif = _indeksNavbar == i;
+
+          final List<Widget?> halamanTujuan = [
+            const DashboardPage(),
+            const BloodSugarAnalysisPage(),
+            null,
+            const MealHistoryPage(),
+            const HealthProfilePage()
+          ];
+
+          return GestureDetector(
+            onTap: () {
+              setState(() => _indeksNavbar = i);
+
+              if (halamanTujuan[i] != null) {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => halamanTujuan[i]!));
+              }
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(daftarMenu[i]['ikon'] as IconData,
+                    color: aktif ? const Color(0xFF2979FF) : Colors.grey[400],
+                    size: 24),
+                const SizedBox(height: 3),
+                Text(daftarMenu[i]['label'] as String,
+                    style: TextStyle(
+                        fontSize: 10,
+                        color:
+                            aktif ? const Color(0xFF2979FF) : Colors.grey[400],
+                        fontWeight:
+                            aktif ? FontWeight.w600 : FontWeight.normal)),
+              ],
+            ),
+          );
+        }),
       ),
     );
   }
@@ -338,7 +610,7 @@ class _GrafisPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final double nilaiMin = 60;
-    final double nilaiMax = 180;
+    final double nilaiMax = max(220, data.where((v) => v > 0).fold(0.0, (a, b) => a > b ? a : b) + 20);
     final double rentang = nilaiMax - nilaiMin;
     final double padTop = 20;
     final double padBottom = 10;
@@ -349,9 +621,9 @@ class _GrafisPainter extends CustomPainter {
     }
 
     double toX(int i) {
-      return i * size.width / (data.length - 1);
-    }
-
+  if (data.length <= 1) return size.width / 2;
+  return i * size.width / (data.length - 1);
+}
     // Garis referensi
     final paintRef = Paint()
       ..strokeWidth = 1
@@ -362,7 +634,7 @@ class _GrafisPainter extends CustomPainter {
     canvas.drawLine(Offset(0, toY(160)), Offset(size.width, toY(160)), paintRef);
     // Garis Normal (70-140)
     paintRef.color = Colors.grey.withValues(alpha: 0.25);
-    canvas.drawLine(Offset(0, toY(120)), Offset(size.width, toY(120)), paintRef);
+    canvas.drawLine(Offset(0, toY(180)), Offset(size.width, toY(180)), paintRef);
     // Garis Rendah
     paintRef.color = Colors.orange.withValues(alpha: 0.3);
     canvas.drawLine(Offset(0, toY(70)), Offset(size.width, toY(70)), paintRef);
@@ -376,22 +648,26 @@ class _GrafisPainter extends CustomPainter {
       tp.paint(canvas, Offset(size.width - tp.width - 2, y - 10));
     }
     drawLabel('Tinggi (180+)', toY(160), Colors.red.withValues(alpha: 0.5));
-    drawLabel('Normal (70-140)', toY(120), Colors.grey.withValues(alpha: 0.5));
+    drawLabel('Normal (70-180)', toY(180), Colors.grey.withValues(alpha: 0.5));
     drawLabel('Rendah (70-)', toY(70), Colors.orange.withValues(alpha: 0.5));
 
     // Buat path kurva halus
     final path = Path();
     final pathIsi = Path();
 
+    bool pathDimulai = false;
     for (int i = 0; i < data.length; i++) {
+      if (data[i] <= 0) continue; // skip hari/bulan kosong
       final x = toX(i);
       final y = toY(data[i]);
-      if (i == 0) {
+      if (!pathDimulai) {
         path.moveTo(x, y);
         pathIsi.moveTo(x, y);
+        pathDimulai = true;
       } else {
-        final prevX = toX(i - 1);
-        final prevY = toY(data[i - 1]);
+        final prevIdx = data.sublist(0, i).lastIndexWhere((v) => v > 0);
+        final prevX = toX(prevIdx);
+        final prevY = toY(data[prevIdx]);
         final cp1x = prevX + (x - prevX) / 2;
         final cp2x = prevX + (x - prevX) / 2;
         path.cubicTo(cp1x, prevY, cp2x, y, x, y);
@@ -399,10 +675,16 @@ class _GrafisPainter extends CustomPainter {
       }
     }
 
+    if (!pathDimulai) return; // tidak ada data sama sekali
+
     // Isi gradien di bawah kurva
-    pathIsi.lineTo(toX(data.length - 1), size.height);
-    pathIsi.lineTo(0, size.height);
-    pathIsi.close();
+    final lastValidIdx = data.lastIndexWhere((v) => v > 0);
+    final firstValidIdx = data.indexWhere((v) => v > 0);
+    if (lastValidIdx >= 0) {
+      pathIsi.lineTo(toX(lastValidIdx), size.height);
+      pathIsi.lineTo(toX(firstValidIdx), size.height);
+      pathIsi.close();
+    }
 
     final gradienIsi = Paint()
       ..shader = LinearGradient(
@@ -421,12 +703,14 @@ class _GrafisPainter extends CustomPainter {
     canvas.drawPath(path, paintGaris);
 
     // Titik aktif (KAM)
-    final xAktif = toX(indeksAktif);
-    final yAktif = toY(data[indeksAktif]);
-    final paintTitikLuar = Paint()..color = Colors.white;
-    final paintTitikDalam = Paint()..color = const Color(0xFF2979FF);
-    canvas.drawCircle(Offset(xAktif, yAktif), 7, paintTitikLuar);
-    canvas.drawCircle(Offset(xAktif, yAktif), 4.5, paintTitikDalam);
+    if (indeksAktif >= 0 && indeksAktif < data.length && data[indeksAktif] > 0) {
+      final xAktif = toX(indeksAktif);
+      final yAktif = toY(data[indeksAktif]);
+      final paintTitikLuar = Paint()..color = Colors.white;
+      final paintTitikDalam = Paint()..color = const Color(0xFF2979FF);
+      canvas.drawCircle(Offset(xAktif, yAktif), 7, paintTitikLuar);
+      canvas.drawCircle(Offset(xAktif, yAktif), 4.5, paintTitikDalam);
+    }
   }
 
   @override
