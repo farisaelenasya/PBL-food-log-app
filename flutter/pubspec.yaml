@@ -10,33 +10,37 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # YT (AMAN WEB + MOBILE)
+  youtube_player_iframe: ^5.2.1
+  url_launcher: ^6.3.0
+
   # UI
   cupertino_icons: ^1.0.8
-  
+
   # Database & Storage
   sqflite: ^2.3.3
   path: ^1.9.0
   shared_preferences: ^2.3.3
-  
+
   # Image & Camera
   image_picker: ^1.0.7
-  
-  # Environment Variables (API Keys)
+
+  # Env
   flutter_dotenv: ^5.1.0
-  
+
   # Utilities
   uuid: ^4.4.0
   intl: ^0.19.0
-  
+
   # State Management
   provider: ^6.1.2
-  
+
   # Networking
   http: ^1.1.0
-  
+
   # Notifications
   flutter_local_notifications: ^18.0.1
-  
+
   # Charts
   fl_chart: ^0.66.0
 
