@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/artikel_model.dart';
 import '../services/api_service.dart';
 import 'health_profile_page.dart';
@@ -28,6 +29,8 @@ class _DashboardPageState extends State<DashboardPage> {
   String _namaUser = '';
   String _hariTanggal = '';
   String? _fotoProfilUrl;
+  List<ArtikelModel> artikelList = [];
+  bool isLoadingArtikel = true;
 
   final PageController _tipsController = PageController();
   List<double> _dataGlukosa = [0, 0, 0, 0, 0, 0, 0];
@@ -40,6 +43,22 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     _muatUser();
     _formatHariTanggal();
+    _loadArtikel();
+  }
+
+  Future<void> _loadArtikel() async {
+    try {
+      final data = await ApiService.getArtikel();
+      setState(() {
+        artikelList = data;
+        isLoadingArtikel = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoadingArtikel = false;
+      });
+      debugPrint('Error load artikel: $e');
+    }
   }
 
   Future<void> _muatUser() async {
@@ -629,7 +648,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     elevation: 0,
                   ),
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BloodSugarAnalysisPage())),
-                  child: const Text('Lihat Detail', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)), ),
+                  child: const Text('Lihat Detail', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                ),
               ],
             ),
           ],
@@ -641,73 +661,70 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildGrafikBatang() {
     final double nilaiMaks = _dataGlukosa.reduce((a, b) => a > b ? a : b);
     if (nilaiMaks == 0) {
-  return SizedBox(
-    height: 80,
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: List.generate(7, (i) => Container(
-        width: 28, height: 4,
-        decoration: BoxDecoration(
-          color: const Color(0xFFBBDEFB),
-          borderRadius: BorderRadius.circular(6),
-        ),
-      )),
-    ),
-  );
-}
-
-    return SizedBox(
-  height: 80,
-  child: Stack(
-    children: [
-      // Garis referensi 140 mg/dL
-      Positioned(
-        top: 80 * (1 - (140 / nilaiMaks)).clamp(0.0, 1.0),
-        left: 0, right: 0,
-        child: Row(children: [
-          Text('140', style: TextStyle(fontSize: 8, color: Colors.green[300])),
-          const SizedBox(width: 4),
-          Expanded(child: Container(height: 1,
-            color: Colors.green.withValues(alpha: 0.3))),
-        ]),
-      ),
-      // Garis referensi 70 mg/dL
-      Positioned(
-        top: 80 * (1 - (70 / nilaiMaks)).clamp(0.0, 1.0),
-        left: 0, right: 0,
-        child: Row(children: [
-          Text('70', style: TextStyle(fontSize: 8, color: Colors.orange[300])),
-          const SizedBox(width: 4),
-          Expanded(child: Container(height: 1,
-            color: Colors.orange.withValues(alpha: 0.3))),
-        ]),
-      ),
-      // Bar chart
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(7, (i) {
-          final tinggi = (_dataGlukosa[i] / nilaiMaks) * 80;
-          final isTerbaru = i == 6;
-          final warnaBar = isTerbaru
-              ? (_nilaiTerbaru <= 140 ? Colors.green : Colors.orange)
-              : const Color(0xFF90CAF9);
-          return Container(
-            width: 28,
-            height: tinggi,
+      return SizedBox(
+        height: 80,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(7, (i) => Container(
+            width: 28, height: 4,
             decoration: BoxDecoration(
-              color: warnaBar,
+              color: const Color(0xFFBBDEFB),
               borderRadius: BorderRadius.circular(6),
             ),
-          );
-        }),
+          )),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 80,
+      child: Stack(
+        children: [
+          Positioned(
+            top: 80 * (1 - (140 / nilaiMaks)).clamp(0.0, 1.0),
+            left: 0, right: 0,
+            child: Row(children: [
+              Text('140', style: TextStyle(fontSize: 8, color: Colors.green[300])),
+              const SizedBox(width: 4),
+              Expanded(child: Container(height: 1,
+                color: Colors.green.withValues(alpha: 0.3))),
+            ]),
+          ),
+          Positioned(
+            top: 80 * (1 - (70 / nilaiMaks)).clamp(0.0, 1.0),
+            left: 0, right: 0,
+            child: Row(children: [
+              Text('70', style: TextStyle(fontSize: 8, color: Colors.orange[300])),
+              const SizedBox(width: 4),
+              Expanded(child: Container(height: 1,
+                color: Colors.orange.withValues(alpha: 0.3))),
+            ]),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(7, (i) {
+              final tinggi = (_dataGlukosa[i] / nilaiMaks) * 80;
+              final isTerbaru = i == 6;
+              final warnaBar = isTerbaru
+                  ? (_nilaiTerbaru <= 140 ? Colors.green : Colors.orange)
+                  : const Color(0xFF90CAF9);
+              return Container(
+                width: 28,
+                height: tinggi,
+                decoration: BoxDecoration(
+                  color: warnaBar,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              );
+            }),
+          ),
+        ],
       ),
-    ],
-  ),
-);
+    );
   }
-  
+
   Widget _buildAksiCepat() {
     final daftarAksi = [
       {
@@ -715,7 +732,7 @@ class _DashboardPageState extends State<DashboardPage> {
         'warna': const Color(0xFF2979FF),
         'bg': const Color(0xFFE3F2FD),
         'judul': 'Catat Gula Darah',
-        'subjudul': '' ,
+        'subjudul': '',
         'halaman': const AddGlucosePage()
       },
       {
@@ -739,22 +756,22 @@ class _DashboardPageState extends State<DashboardPage> {
         'warna': const Color(0xFFFFB300),
         'bg': const Color(0xFFFFF8E1),
         'judul': 'Hadiah & Poin',
-        'subjudul': '750/1000 poin • Level 5',
+'subjudul': 'Poin & level kamu',
         'halaman': const RewardsPage()
       },
     ];
 
-   return Padding(
-  padding: const EdgeInsets.symmetric(horizontal: 20),
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text('Aksi Cepat', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
-      const SizedBox(height: 8),
-      ...daftarAksi.map((aksi) => _buildKartuAksi(aksi)),
-    ],
-  ),
-);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Aksi Cepat', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
+          const SizedBox(height: 8),
+          ...daftarAksi.map((aksi) => _buildKartuAksi(aksi)),
+        ],
+      ),
+    );
   }
 
   Widget _buildKartuAksi(Map<String, dynamic> aksi) {
@@ -815,7 +832,6 @@ class _DashboardPageState extends State<DashboardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header dengan badge kondisi
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
@@ -849,48 +865,45 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ),
         const SizedBox(height: 10),
-        // Tab selector
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: List.generate(tips.length, (i) {
-              final aktif = _indeksTips == i;
-              final warna = (tips[i]['warna'] as List<Color>)[0];
-              return GestureDetector(
-                onTap: () {
-                  setState(() => _indeksTips = i);
-                  _tipsController.animateToPage(i,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  margin: const EdgeInsets.only(right: 8),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: aktif ? warna : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    tips[i]['kategori'] as String,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: aktif ? Colors.white : Colors.grey[600],
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: List.generate(tips.length, (i) {
+                final aktif = _indeksTips == i;
+                final warna = (tips[i]['warna'] as List<Color>)[0];
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _indeksTips = i);
+                    _tipsController.animateToPage(i,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    margin: const EdgeInsets.only(right: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: aktif ? warna : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      tips[i]['kategori'] as String,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: aktif ? Colors.white : Colors.grey[600],
+                      ),
                     ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ),
-        ),
-      
         const SizedBox(height: 12),
-        // Card carousel
         SizedBox(
           height: _indeksTips == 0 ? 110 : 220,
           child: PageView.builder(
@@ -1106,9 +1119,7 @@ class _DashboardPageState extends State<DashboardPage> {
             },
           ),
         ),
-
         const SizedBox(height: 8),
-        // Dot indicator
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(
@@ -1140,17 +1151,16 @@ class _DashboardPageState extends State<DashboardPage> {
     ];
 
     return Container(
-  decoration: BoxDecoration(
-    color: Colors.white,
-    boxShadow: [
-      BoxShadow(
-          color: Colors.black.withValues(alpha: 0.07),
-          blurRadius: 20,
-          offset: const Offset(0, -4))
-    ],
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.07),
+              blurRadius: 20,
+              offset: const Offset(0, -4))
+        ],
       ),
-      
-    padding: const EdgeInsets.fromLTRB(0, 10, 0, 24),
+      padding: const EdgeInsets.fromLTRB(0, 10, 0, 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: List.generate(daftarMenu.length, (i) {
@@ -1189,14 +1199,14 @@ class _DashboardPageState extends State<DashboardPage> {
           ];
 
           return GestureDetector(
-           onTap: () async {
-            setState(() => _indeksAktif = i);
-            if (halamanTujuan[i] != null) {
-            await Navigator.push(context,
-        MaterialPageRoute(builder: (_) => halamanTujuan[i]!));
-    setState(() => _indeksAktif = 0); // reset ke Beranda saat kembali
-  }
-},
+            onTap: () async {
+              setState(() => _indeksAktif = i);
+              if (halamanTujuan[i] != null) {
+                await Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => halamanTujuan[i]!));
+                setState(() => _indeksAktif = 0); // reset ke Beranda saat kembali
+              }
+            },
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1219,8 +1229,14 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // ignore: unused_element
   Widget _buildEdukasi() {
+    if (isLoadingArtikel) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -1235,20 +1251,12 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
           const SizedBox(height: 10),
-          ...daftarArtikel.map((artikel) {
-            return GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DetailArtikelPage(
-                      artikel: artikel,
-                    ),
-                  ),
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
+          if (artikelList.isEmpty)
+            Text('Belum ada artikel', style: TextStyle(color: Colors.grey[500]))
+          else
+            ...artikelList.map((artikel) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -1260,58 +1268,27 @@ class _DashboardPageState extends State<DashboardPage> {
                     )
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // GAMBAR
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(16),
-                      ),
-                      child: Image.network(
-                       artikel.gambar,
-                      height: 140,
-                       width: double.infinity,
-                       fit: BoxFit.cover,
-                       errorBuilder: (context, error, stackTrace) => Container(
-                       height: 140,
-                       color: Colors.grey[200],
-                       child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 40),
-  ),
-),
-                    ),
+                child: ListTile(
+                  leading: const Icon(Icons.article_outlined, color: Color(0xFF2979FF)),
+                  title: Text(artikel.judul,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  subtitle: Text(artikel.kategori,
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () async {
+                    final link = artikel.linkArtikel;
+                    if (link == null || link.isEmpty) return;
 
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            artikel.judul,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: Color(0xFF2979FF),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            artikel.isi,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                    final uri = Uri.tryParse(link);
+                    if (uri == null) return;
+
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
                 ),
-              ),
-            );
-          }).toList(),
+              );
+            }),
         ],
       ),
     );
