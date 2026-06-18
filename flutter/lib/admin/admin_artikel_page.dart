@@ -1,34 +1,25 @@
-// ============================================================
-// FILE: admin_artikel_page.dart
-// APLIKASI: DiabеTrack - Panel Admin
-// BAGIAN: Tab 3 - Manajemen Artikel
-// FUNGSI: Admin melihat daftar artikel dengan statistik total,
-//         pembaca bulan ini, search, filter kategori, dan
-//         setiap artikel ada tombol Edit & Hapus.
-//         Tombol "Buat Artikel Baru" membuka AdminBuatArtikelPage.
-// ============================================================
-
 import 'package:flutter/material.dart';
 import 'admin_add_artikel_page.dart';
+import 'package:intl/intl.dart';
+import '../services/api_service.dart';
+import '../models/artikel_model.dart';
 
 // ── Model artikel ─────────────────────────────────────────────
 class DataArtikel {
   String judul;
   String kategori;
   String tanggal;
-  int views;
-  int komentar;
   bool diterbitkan;
   String isiSingkat;
+  String? linkArtikel;
 
   DataArtikel({
     required this.judul,
     required this.kategori,
     required this.tanggal,
-    required this.views,
-    required this.komentar,
     required this.diterbitkan,
     required this.isiSingkat,
+    this.linkArtikel,
   });
 }
 
@@ -43,37 +34,49 @@ class _AdminArtikelPageState extends State<AdminArtikelPage> {
   final _cariCtrl = TextEditingController();
   String _filterKategori = 'Semua';
 
-  final List<DataArtikel> _artikel = [
-    DataArtikel(
-      judul: 'Pentingnya Pemeriksaan Rutin Tekanan Darah di Usia Produktif',
-      kategori: 'KESEHATAN JANTUNG',
-      tanggal: 'Diterbitkan 12 Okt 2023',
-      views: 1200,
-      komentar: 8,
-      diterbitkan: true,
-      isiSingkat:
-          'Penyakit kardiovaskular seringkali tidak menunjukkan gejala di tahap awal. Artikel ini...',
-    ),
-    DataArtikel(
-      judul: 'Diet Seimbang untuk Penderita Diabetes Tipe 2: Panduan Lengkap',
-      kategori: 'NUTRISI',
-      tanggal: 'Diterbitkan 10 Okt 2023',
-      views: 980,
-      komentar: 5,
-      diterbitkan: true,
-      isiSingkat:
-          'Mengatur pola makan yang tepat adalah kunci utama dalam mengelola diabetes tipe 2...',
-    ),
-    DataArtikel(
-      judul: 'Olahraga Ringan yang Aman untuk Penderita Diabetes',
-      kategori: 'GAYA HIDUP',
-      tanggal: 'Draf — belum diterbitkan',
-      views: 0,
-      komentar: 0,
-      diterbitkan: false,
-      isiSingkat: 'Aktivitas fisik membantu mengontrol kadar gula darah secara alami...',
-    ),
-  ];
+  List<DataArtikel> _artikel = [];
+ bool _isLoading = true;
+
+@override
+void initState() {
+  super.initState();
+  _loadArtikel();
+}
+
+Future<void> _loadArtikel() async {
+  try {
+    final data = await ApiService.getArtikel();
+   
+   for (var e in data) {
+  print("JUDUL: ${e.judul}");
+  print("LINK: ${e.linkArtikel}");
+}
+    setState(() {
+  _artikel = data.map((e) {
+    return DataArtikel(
+  judul: e.judul,
+  kategori: e.kategori,
+  tanggal: DateFormat(
+    'dd MMM yyyy',
+  ).format(
+    DateTime.parse(e.createdAt),
+  ),
+  diterbitkan: true,
+  isiSingkat: e.isi,
+  linkArtikel: e.linkArtikel,
+);
+  }).toList();
+
+  _isLoading = false;
+});
+  }catch (e) {
+    print("ERROR ARTIKEL: $e");
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
+}
 
   final List<String> _kategoriList = [
     'Semua', 'KESEHATAN JANTUNG', 'NUTRISI', 'GAYA HIDUP', 'MEDIS',
@@ -92,7 +95,11 @@ class _AdminArtikelPageState extends State<AdminArtikelPage> {
   @override
   Widget build(BuildContext context) {
     final totalDiterbitkan = _artikel.where((a) => a.diterbitkan).length;
+    final totalArtikel = _artikel.length;
 
+    final totalDraft =_artikel.where((a) => !a.diterbitkan).length;
+
+    final totalKategori =_artikel.map((e) => e.kategori).toSet().length;
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: SafeArea(
@@ -141,12 +148,14 @@ class _AdminArtikelPageState extends State<AdminArtikelPage> {
                             ),
                           ),
                         ),
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text(
-                          '+ Buat Artikel Baru',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 14),
-                        ),
+                      icon: const Icon(
+                      Icons.add_circle_outline_rounded,size: 20,),
+                       label: const Text(
+                       'Buat Artikel Baru',
+                        style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                         fontSize: 15,  ),
+                       ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1A73E8),
                           foregroundColor: Colors.white,
@@ -159,25 +168,40 @@ class _AdminArtikelPageState extends State<AdminArtikelPage> {
                     const SizedBox(height: 16),
 
                     // ── Statistik ───────────────────────────
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _kartuStatArtikel(
-                            'Total Artikel Terbit',
-                            '$totalDiterbitkan',
-                            '+12% dari bulan lalu',
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _kartuStatArtikel(
-                            'Pembaca Bulan Ini',
-                            '4.2k',
-                            null,
-                          ),
-                        ),
-                      ],
-                    ),
+                  GridView.count(
+  shrinkWrap: true,
+  physics: const NeverScrollableScrollPhysics(),
+  crossAxisCount: 2,
+  childAspectRatio: 1.6,
+  crossAxisSpacing: 12,
+  mainAxisSpacing: 12,
+  children: [
+
+    _kartuStatArtikel(
+      'Total Artikel',
+      '$totalArtikel',
+      null,
+    ),
+
+    _kartuStatArtikel(
+      'Publish',
+      '$totalDiterbitkan',
+      null,
+    ),
+
+    _kartuStatArtikel(
+      'Draft',
+      '$totalDraft',
+      null,
+    ),
+
+    _kartuStatArtikel(
+      'Kategori',
+      '$totalKategori',
+      null,
+    ),
+  ],
+),
                     const SizedBox(height: 16),
 
                     // ── Search ──────────────────────────────
@@ -225,29 +249,38 @@ class _AdminArtikelPageState extends State<AdminArtikelPage> {
     );
   }
 
-  Widget _buildAppBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: const [
-          Text(
-            'Admin Log Medis',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1A2340),
-            ),
+  
+    Widget _buildAppBar() {
+  return Container(
+    padding: const EdgeInsets.symmetric(
+      horizontal: 20,
+      vertical: 16,
+    ),
+    color: Colors.white,
+    child: Row(
+      children: [
+        Container(
+          width: 4,
+          height: 24,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A73E8),
+            borderRadius: BorderRadius.circular(10),
           ),
-          Icon(Icons.notifications_none_rounded,
-              color: Color(0xFF78909C), size: 24),
-        ],
-      ),
-    );
-  }
-
-  Widget _kartuStatArtikel(String label, String nilai, String? sub) {
+        ),
+        const SizedBox(width: 10),
+        const Text(
+          'AdminFoodLog',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1A2340),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+ Widget _kartuStatArtikel( String label, String nilai, String? sub) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -360,13 +393,15 @@ class _AdminArtikelPageState extends State<AdminArtikelPage> {
             ),
             child: Center(
               child: Icon(
-                a.kategori == 'NUTRISI'
-                    ? Icons.restaurant_rounded
-                    : a.kategori == 'GAYA HIDUP'
-                        ? Icons.directions_run_rounded
-                        : Icons.favorite_rounded,
-                size: 48,
-                color: Colors.white.withOpacity(0.6),
+              a.kategori == 'NUTRISI'
+              ? Icons.restaurant_menu_rounded
+               : a.kategori == 'GAYA HIDUP'
+              ? Icons.health_and_safety_rounded
+               : a.kategori == 'MEDIS'
+              ? Icons.medical_services_rounded
+               : Icons.favorite_rounded,
+               size: 48,
+               color: Colors.white.withOpacity(0.6),
               ),
             ),
           ),
@@ -439,24 +474,32 @@ class _AdminArtikelPageState extends State<AdminArtikelPage> {
                 // Stats + tombol edit/hapus
                 Row(
                   children: [
-                    Icon(Icons.remove_red_eye_outlined,
-                        size: 14, color: Colors.grey.shade400),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${a.views >= 1000 ? '${(a.views / 1000).toStringAsFixed(1)}k' : a.views}',
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF90A4AE)),
-                    ),
-                    const SizedBox(width: 10),
-                    Icon(Icons.chat_bubble_outline_rounded,
-                        size: 14, color: Colors.grey.shade400),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${a.komentar}',
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF90A4AE)),
-                    ),
-                    const Spacer(),
+                   Container(
+  padding: const EdgeInsets.symmetric(
+    horizontal: 10,
+    vertical: 5,
+  ),
+  decoration: BoxDecoration(
+    color: a.diterbitkan
+        ? Colors.green.shade50
+        : Colors.orange.shade50,
+    borderRadius: BorderRadius.circular(8),
+  ),
+  child: Text(
+    a.diterbitkan
+        ? 'Dipublikasikan'
+        : 'Draft',
+    style: TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      color: a.diterbitkan
+          ? Colors.green
+          : Colors.orange,
+    ),
+  ),
+),
+
+const Spacer(),
 
                     // Tombol Edit
                     GestureDetector(
