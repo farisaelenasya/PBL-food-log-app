@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'dart:io'; // 🔥 Tambahkan ini untuk File
-import 'dart:typed_data'; // 🔥 Tambahkan ini untuk Uint8List
+import 'dart:typed_data'; 
 import 'blood_sugar_analysis_page.dart';
 import 'food_photo_input_page.dart';
 import 'health_profile_page.dart';
 import 'meal_history_page.dart';
 import 'package:intl/intl.dart';
-import '../database/database_helper.dart';
+import '../services/api_service.dart';
+import 'dart:convert';
 
 class FoodAnalysisPage extends StatefulWidget {
   final String namaMakanan;
@@ -43,28 +43,36 @@ class _FoodAnalysisPageState extends State<FoodAnalysisPage> {
     _loadFoodData();
   }
 
-  Future<void> _loadFoodData() async {
-    final dbHelper = DatabaseHelper.instance;
-    Map<String, dynamic>? data;
-    
-    // Cari berdasarkan foodId atau nama makanan
-    if (widget.foodId != null) {
-      data = await dbHelper.getFoodById(widget.foodId!);
-    } else {
-      // Cari berdasarkan nama
-      final allFoods = await dbHelper.getAllFoods();
-      data = allFoods.firstWhere(
-        (food) => food['nama'].toLowerCase() == widget.namaMakanan.toLowerCase(),
-        orElse: () => {},
-      );
-    }
-    
+Future<void> _loadFoodData() async {
+  try {
+    Map<String, dynamic>? data = widget.foodData;
+
+    data ??= {
+      'id': 'manual_food',
+      'nama': widget.namaMakanan,
+      'emoji': '🍽️',
+      'kalori_100g': 250,
+      'karbo_100g': 30,
+      'protein_100g': 10,
+      'lemak_100g': 8,
+      'serat_100g': 2,
+      'gula_100g': 3,
+      'kategori': 'manual',
+      'indeks_glikemik': 50,
+    };
+
     setState(() {
       _foodData = data;
       _isLoading = false;
     });
-  }
+  } catch (e) {
+    print('Error loading food data: $e');
 
+    setState(() {
+      _isLoading = false;
+    });
+  }
+}
   Map<String, dynamic> get _nutrisi {
     if (_foodData != null && _foodData!.isNotEmpty) {
       final karbo = (_foodData!['karbo_100g'] as num).toDouble();
@@ -103,6 +111,18 @@ class _FoodAnalysisPageState extends State<FoodAnalysisPage> {
     final karboPer100g = _nutrisi['karbo'] as double;
     final porsiGram = widget.porsiGram ?? 250;
     return (karboPer100g * porsiGram / 100);
+  }
+  
+  double get _proteinPerPorsi {
+    final proteinPer100g = _nutrisi['protein'] as double;
+    final porsiGram = widget.porsiGram ?? 250;
+    return (proteinPer100g * porsiGram / 100);
+  }
+
+  double get _lemakPerPorsi {
+    final lemakPer100g = _nutrisi['lemak'] as double;
+    final porsiGram = widget.porsiGram ?? 250;
+    return (lemakPer100g * porsiGram / 100);
   }
 
   String get _pesanPeringatan {
@@ -149,7 +169,7 @@ class _FoodAnalysisPageState extends State<FoodAnalysisPage> {
   }
 
   Future<void> _simpanKeJurnal() async {
-    if (_foodData == null) {
+    if (_foodData == null || _foodData!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Data makanan tidak ditemukan'),
@@ -159,20 +179,47 @@ class _FoodAnalysisPageState extends State<FoodAnalysisPage> {
       return;
     }
 
-    final dbHelper = DatabaseHelper.instance;
     final now = DateTime.now();
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     
     final foodLogData = {
-      'id': id,
-      'food_id': _foodData!['id'],
-      'gram': widget.porsiGram ?? 250,
-      'waktu_makan': widget.waktuMakan,
-      'foto_path': widget.fotoPath,
-      'dicatat_pada': DateFormat('yyyy-MM-dd HH:mm:ss').format(now),
-    };
-    
-    await dbHelper.insertFoodLog(foodLogData);
+  'nama_makanan': _foodData!['nama'],
+  'gram': widget.porsiGram ?? 250,
+  'waktu_makan': widget.waktuMakan,
+
+  'foto_path': widget.fotoPath,
+  'kalori': _kaloriPerPorsi,
+
+  'karbo': ((_foodData!['karbo_100g'] ?? 0) as num).toDouble() *
+      ((widget.porsiGram ?? 250) / 100),
+
+  'protein': ((_foodData!['protein_100g'] ?? 0) as num).toDouble() *
+      ((widget.porsiGram ?? 250) / 100),
+
+  'lemak': ((_foodData!['lemak_100g'] ?? 0) as num).toDouble() *
+      ((widget.porsiGram ?? 250) / 100),
+
+  'serat': ((_foodData!['serat_100g'] ?? 0) as num).toDouble() *
+      ((widget.porsiGram ?? 250) / 100),
+
+  'gula': ((_foodData!['gula_100g'] ?? 0) as num).toDouble() *
+      ((widget.porsiGram ?? 250) / 100),
+
+  'indeks_glikemik': _foodData!['indeks_glikemik'] ?? 50,
+
+  'dicatat_pada':
+      DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+};
+    print("=== FOTO PATH ===");
+    print(widget.fotoPath);
+
+    print("=== JSON DIKIRIM ===");
+    print(jsonEncode(foodLogData));
+    final success = await ApiService.saveFoodLog(foodLogData);
+
+if (!success) {
+  throw Exception('Gagal menyimpan ke server');
+}
     
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -282,11 +329,28 @@ class _FoodAnalysisPageState extends State<FoodAnalysisPage> {
               width: double.infinity,
               height: 220,
               color: Colors.amber[100],
-              child: widget.fotoPath != null && widget.fotoPath!.isNotEmpty
-                  ? (widget.fotoPath!.startsWith('http')
-                      ? Image.network(widget.fotoPath!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildPlaceholder())
-                      : Image.file(File(widget.fotoPath!), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildPlaceholder()))
-                  : _buildPlaceholder(),
+              child: widget.imageBytes != null
+    ? Image.memory(
+        widget.imageBytes!,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildPlaceholder(),
+      )
+    : widget.fotoPath != null &&
+            widget.fotoPath!.isNotEmpty
+        ? (widget.fotoPath!.startsWith('http')
+            ? Image.network(
+                widget.fotoPath!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    _buildPlaceholder(),
+              )
+            : Image.asset(
+                widget.fotoPath!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    _buildPlaceholder(),
+              ))
+        : _buildPlaceholder(),
             ),
             Positioned(
               bottom: 12,
@@ -416,9 +480,8 @@ class _FoodAnalysisPageState extends State<FoodAnalysisPage> {
               const SizedBox(width: 10),
               _buildKartuNutrisi(_karboPerPorsi.toStringAsFixed(0), 'KARBO', Colors.orange, true),
               const SizedBox(width: 10),
-              _buildKartuNutrisi('${nutrisi['protein'].toStringAsFixed(0)}', 'PROTEIN', Colors.green, false),
-              const SizedBox(width: 10),
-              _buildKartuNutrisi('${nutrisi['lemak'].toStringAsFixed(0)}', 'LEMAK', Colors.red, false),
+              _buildKartuNutrisi(_proteinPerPorsi.toStringAsFixed(0),'PROTEIN',Colors.green,true,),
+              _buildKartuNutrisi(_lemakPerPorsi.toStringAsFixed(0),'LEMAK',Colors.red,true,),
             ],
           ),
           const SizedBox(height: 8),
