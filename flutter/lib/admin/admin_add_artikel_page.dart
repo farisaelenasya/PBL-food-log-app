@@ -1,14 +1,6 @@
-// ============================================================
-// FILE: admin_buat_artikel_page.dart
-// APLIKASI: DiabеTrack - Panel Admin
-// BAGIAN: Halaman Buat / Edit Artikel
-// FUNGSI: Form editor artikel: judul, isi artikel (toolbar
-//         format bold/italic/list), pilih kategori dropdown,
-//         upload gambar sampul, tombol Terbitkan & Simpan Draf.
-// ============================================================
-
 import 'package:flutter/material.dart';
 import 'admin_artikel_page.dart';
+import '../services/api_service.dart';
 
 class AdminBuatArtikelPage extends StatefulWidget {
   final DataArtikel? artikelEdit; // null = buat baru
@@ -29,7 +21,7 @@ class _AdminBuatArtikelPageState extends State<AdminBuatArtikelPage> {
   final _judulCtrl = TextEditingController();
   final _isiCtrl = TextEditingController();
   String _kategori = 'KESEHATAN JANTUNG';
-  bool _adaGambar = false;
+  final _linkCtrl = TextEditingController();
   bool _isSaving = false;
 
   final List<String> _kategoriList = [
@@ -47,6 +39,7 @@ class _AdminBuatArtikelPageState extends State<AdminBuatArtikelPage> {
       _judulCtrl.text = widget.artikelEdit!.judul;
       _isiCtrl.text = widget.artikelEdit!.isiSingkat;
       _kategori = widget.artikelEdit!.kategori;
+      _linkCtrl.text = widget.artikelEdit?.linkArtikel ?? '';
     }
   }
 
@@ -54,47 +47,54 @@ class _AdminBuatArtikelPageState extends State<AdminBuatArtikelPage> {
   void dispose() {
     _judulCtrl.dispose();
     _isiCtrl.dispose();
+    _linkCtrl.dispose();
     super.dispose();
   }
-
-  void _terbitkan() async {
-    if (_judulCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Judul artikel tidak boleh kosong'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-    setState(() => _isSaving = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    setState(() => _isSaving = false);
-
-    final artikel = DataArtikel(
-      judul: _judulCtrl.text.trim(),
-      kategori: _kategori,
-      tanggal: 'Diterbitkan hari ini',
-      views: widget.artikelEdit?.views ?? 0,
-      komentar: widget.artikelEdit?.komentar ?? 0,
-      diterbitkan: true,
-      isiSingkat: _isiCtrl.text.trim().isEmpty
-          ? 'Konten artikel baru...'
-          : _isiCtrl.text.trim(),
+  
+ 
+ Future<void> _terbitkan() async {
+  if (_judulCtrl.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Judul artikel tidak boleh kosong'),
+        backgroundColor: Colors.red,
+      ),
     );
-    widget.onSimpan(artikel);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Artikel berhasil diterbitkan!'),
-          backgroundColor: Color(0xFF26A69A),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      Navigator.pop(context);
-    }
+    return;
   }
+
+  setState(() => _isSaving = true);
+
+  final berhasil = await ApiService.tambahArtikel(
+    judul: _judulCtrl.text.trim(),
+    kategori: _kategori,
+    isi: _isiCtrl.text.trim(),
+    link: _linkCtrl.text.trim(),
+   );
+
+  setState(() => _isSaving = false);
+
+  if (!berhasil) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Gagal menyimpan artikel'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return;
+  }
+
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Artikel berhasil diterbitkan'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    Navigator.pop(context, true);
+  }
+}
 
   void _simpanDraf() async {
     setState(() => _isSaving = true);
@@ -102,16 +102,15 @@ class _AdminBuatArtikelPageState extends State<AdminBuatArtikelPage> {
     setState(() => _isSaving = false);
 
     final artikel = DataArtikel(
-      judul: _judulCtrl.text.trim().isEmpty
-          ? 'Artikel tanpa judul'
-          : _judulCtrl.text.trim(),
-      kategori: _kategori,
-      tanggal: 'Draf — belum diterbitkan',
-      views: 0,
-      komentar: 0,
-      diterbitkan: false,
-      isiSingkat: _isiCtrl.text.trim(),
-    );
+  judul: _judulCtrl.text.trim().isEmpty
+      ? 'Artikel tanpa judul'
+      : _judulCtrl.text.trim(),
+  kategori: _kategori,
+  tanggal: 'Draf — belum diterbitkan',
+  diterbitkan: false,
+  isiSingkat: _isiCtrl.text.trim(),
+  linkArtikel: _linkCtrl.text.trim(),
+);
     widget.onSimpan(artikel);
 
     if (mounted) {
@@ -134,11 +133,6 @@ class _AdminBuatArtikelPageState extends State<AdminBuatArtikelPage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              size: 18, color: Color(0xFF1A2340)),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: Text(
           isEdit ? 'Edit Artikel' : 'Buat Artikel Baru',
           style: const TextStyle(
@@ -252,7 +246,6 @@ class _AdminBuatArtikelPageState extends State<AdminBuatArtikelPage> {
                         _toolbarIcon(Icons.format_list_numbered_rounded),
                         _toolbarIcon(Icons.format_quote_rounded),
                         _toolbarIcon(Icons.link_rounded),
-                        _toolbarIcon(Icons.image_rounded),
                       ],
                     ),
                   ),
@@ -330,85 +323,29 @@ class _AdminBuatArtikelPageState extends State<AdminBuatArtikelPage> {
             const SizedBox(height: 16),
 
             // ── Gambar sampul ─────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.image_rounded,
-                          size: 16, color: Color(0xFF1A73E8)),
-                      SizedBox(width: 8),
-                      Text(
-                        'Gambar Sampul',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A2340),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  GestureDetector(
-                    onTap: () => setState(() => _adaGambar = !_adaGambar),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: double.infinity,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F7FA),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: _adaGambar
-                              ? const Color(0xFF1A73E8)
-                              : Colors.grey.shade300,
-                          style: BorderStyle.solid,
-                        ),
-                      ),
-                      child: _adaGambar
-                          ? Container(
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFF1565C0),
-                                    Color(0xFF42A5F5)
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Center(
-                                child: Icon(Icons.check_circle_rounded,
-                                    color: Colors.white, size: 40),
-                              ),
-                            )
-                          : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: const [
-                                Icon(Icons.cloud_upload_outlined,
-                                    size: 32, color: Color(0xFFB0BEC5)),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Klik untuk unggah atau seret file',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF90A4AE)),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+         const Text(
+  'Link Artikel',
+  style: TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    color: Color(0xFF78909C),
+  ),
+),
+const SizedBox(height: 8),
+
+TextField(
+  controller: _linkCtrl,
+  decoration: InputDecoration(
+    hintText: 'https://...',
+    prefixIcon: Icon(Icons.link),
+    filled: true,
+    fillColor: Colors.white,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+  ),
+),
+      const SizedBox(height: 10),
             const SizedBox(height: 24),
 
             // ── Tombol Terbitkan ──────────────────────────────
