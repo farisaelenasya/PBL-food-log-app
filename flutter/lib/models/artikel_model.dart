@@ -1,42 +1,28 @@
-class Artikel {
+class ArtikelModel {
+  final int id;
   final String judul;
+  final String kategori;
   final String isi;
-  final String gambar;
+  final String? linkArtikel;
+  final String createdAt;
 
-  Artikel({
+  ArtikelModel({
+    required this.id,
     required this.judul,
+    required this.kategori,
     required this.isi,
-    required this.gambar,
+    this.linkArtikel,
+    required this.createdAt,
   });
 
-  factory Artikel.fromJson(Map<String, dynamic> json) {
-    return Artikel(
+  factory ArtikelModel.fromJson(Map<String, dynamic> json) {
+    return ArtikelModel(
+      id: json['id'],
       judul: json['judul'],
+      kategori: json['kategori'],
       isi: json['isi'],
-      gambar: json['gambar'] ?? '',
+      linkArtikel: json['link_artikel'],
+      createdAt: json['created_at'] ?? '',
     );
   }
 }
-
-final List<Artikel> daftarArtikel = [
-  Artikel(
-    judul: 'Apa itu Diabetes?',
-    isi: 'Diabetes adalah kondisi ketika kadar gula dalam darah terlalu tinggi karena tubuh tidak memproduksi insulin dengan baik.',
-    gambar: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600&q=80',
-  ),
-  Artikel(
-    judul: 'Pentingnya Cek Gula Darah',
-    isi: 'Memantau gula darah secara rutin membantu mencegah komplikasi serius seperti penyakit jantung dan ginjal.',
-    gambar: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&q=80',
-  ),
-  Artikel(
-    judul: 'Tips Pola Makan Sehat',
-    isi: 'Konsumsi makanan tinggi serat, hindari gula berlebih, dan atur porsi makan secara seimbang.',
-    gambar: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&q=80',
-  ),
-  Artikel(
-    judul: 'Manfaat Olahraga',
-    isi: 'Olahraga membantu tubuh menggunakan insulin lebih efektif dan menurunkan kadar gula darah.',
-    gambar: 'https://images.unsplash.com/photo-1554284126-aa88f22d8b74?w=600&q=80',
-  ),
-];
