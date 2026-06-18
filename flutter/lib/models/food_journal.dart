@@ -1,5 +1,3 @@
-// lib/models/jurnal_makanan.dart
-
 import 'food_item.dart';
 
 class JurnalMakanan {
@@ -99,6 +97,22 @@ class JurnalMakanan {
         'dicatat_pada': dicatatPada.toIso8601String(),
         'indeks_glikemik': indeksGlikemik,
       };
+      Map<String, dynamic> toJson() => {
+      'id': id,
+      'nama_makanan': displayNama,
+      'food_id': foodItem?.id,
+      'gram': gram,
+      'waktu_makan': waktuMakan,
+      'kalori': kalori,
+      'karbo': karbo,
+      'protein': protein,
+      'lemak': lemak,
+      'serat': serat,
+      'gula': gula,
+      'foto_path': fotoPath,
+      'dicatat_pada': dicatatPada.toIso8601String(),
+      'indeks_glikemik': indeksGlikemik,
+    };
 
   // ── Dari SQLite biasa
   factory JurnalMakanan.fromMap(Map<String, dynamic> m) {
