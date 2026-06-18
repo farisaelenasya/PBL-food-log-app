@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
-import 'dart:typed_data'; 
+import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'food_analysis_page.dart';
-import '../database/database_helper.dart';
+import '../services/api_service.dart';
 import '../services/food_recognition_service.dart';
 
 class FoodPhotoInputPage extends StatefulWidget {
   final String? existingNama;
   final String? existingWaktu;
-  
+
   const FoodPhotoInputPage({super.key, this.existingNama, this.existingWaktu});
 
   @override
@@ -22,15 +21,123 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
   XFile? _selectedImage;
   final ImagePicker _picker = ImagePicker();
   double _porsiGram = 250;
+  int _jumlahPorsi = 1;
   bool _isLoading = false;
+
+  // Map unit porsi per jenis makanan
+  static const Map<String, String> _foodUnits = {
+    'nasi goreng': 'piring',
+    'mie goreng': 'piring',
+    'kwetiau': 'piring',
+    'pasta': 'piring',
+    'nasi putih': 'piring',
+    'nasi merah': 'piring',
+    'nasi': 'piring',
+    'mie': 'piring',
+    'bakso': 'mangkuk',
+    'soto': 'mangkuk',
+    'ramen': 'mangkuk',
+    'bubur': 'mangkuk',
+    'soup': 'mangkuk',
+    'sup': 'mangkuk',
+    'soto ayam': 'mangkuk',
+    'gado-gado': 'piring',
+    'gado gado': 'piring',
+    'rendang': 'porsi',
+    'gulai': 'porsi',
+    'ayam goreng': 'potong',
+    'ayam bakar': 'potong',
+    'ayam': 'potong',
+    'ikan goreng': 'potong',
+    'ikan bakar': 'potong',
+    'ikan': 'potong',
+    'pizza': 'slice',
+    'roti': 'lembar',
+    'tempe': 'potong',
+    'tahu': 'potong',
+    'telur': 'butir',
+    'es teh': 'gelas',
+    'teh': 'gelas',
+    'jus': 'gelas',
+    'air mineral': 'botol',
+    'kopi': 'cangkir',
+    'susu': 'gelas',
+    'pisang': 'buah',
+    'apel': 'buah',
+    'jeruk': 'buah',
+    'mangga': 'buah',
+    'semangka': 'potong',
+    'pepaya': 'potong',
+    'sushi': 'pcs',
+    'sashimi': 'pcs',
+    'onigiri': 'buah',
+    'gyoza': 'pcs',
+    'takoyaki': 'pcs',
+    'tempura': 'porsi',
+    'spaghetti': 'piring',
+    'lasagna': 'porsi',
+    'risotto': 'piring',
+    'burger': 'buah',
+    'hot dog': 'buah',
+    'french fries': 'porsi',
+    'sandwich': 'buah',
+    'steak': 'porsi',
+    'salad': 'porsi',
+    'donut': 'buah',
+    'pancake': 'lembar',
+    'waffle': 'buah',
+    'croissant': 'buah',
+    'bibimbap': 'mangkuk',
+    'tteokbokki': 'porsi',
+    'kimchi': 'porsi',
+    'korean fried chicken': 'potong',
+    'fried chicken': 'potong',
+    'curry': 'piring',
+    'naan': 'lembar',
+    'kebab': 'buah',
+    'boba': 'gelas',
+    'bubble tea': 'gelas',
+    'ice cream': 'scoop',
+  };
+
+  // Gram estimasi per unit porsi
+  static const Map<String, double> _gramPerUnit = {
+    'piring': 250.0,
+    'mangkuk': 300.0,
+    'potong': 100.0,
+    'slice': 90.0,
+    'lembar': 30.0,
+    'butir': 55.0,
+    'gelas': 200.0,
+    'botol': 600.0,
+    'cangkir': 150.0,
+    'buah': 120.0,
+    'porsi': 200.0,
+    'pcs': 25.0,
+    'scoop': 65.0,
+  };
+
+  String get _unitPorsi {
+    if (_selectedFood == null) return 'porsi';
+    final nama = (_selectedFood!['nama'] as String).toLowerCase();
+    for (final key in _foodUnits.keys) {
+      if (nama.contains(key)) return _foodUnits[key]!;
+    }
+    return 'porsi';
+  }
+
+  double get _gramDariPorsi {
+    final gramPerUnit = _gramPerUnit[_unitPorsi] ?? 200.0;
+    return gramPerUnit * _jumlahPorsi;
+  }
+
   bool _isSearching = false;
-  
+
   List<Map<String, dynamic>> _searchResults = [];
   Map<String, dynamic>? _selectedFood;
-  
-  // 🔥 Tambahkan service untuk AI
+
   final FoodRecognitionService _foodService = FoodRecognitionService();
-  
+
   final List<Map<String, dynamic>> _daftarWaktuMakan = const [
     {'label': 'Sarapan', 'ikon': Icons.wb_sunny_outlined, 'waktu': '06:00-09:00'},
     {'label': 'Siang', 'ikon': Icons.wb_sunny, 'waktu': '11:00-13:00'},
@@ -47,7 +154,7 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
     }
     if (widget.existingWaktu != null) {
       final index = _daftarWaktuMakan.indexWhere(
-        (item) => item['label'] == widget.existingWaktu
+        (item) => item['label'] == widget.existingWaktu,
       );
       if (index != -1) _waktuMakanDipilih = index;
     }
@@ -59,8 +166,49 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
     super.dispose();
   }
 
+  // ==================== HELPER TYPE CONVERSION ====================
+  double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  String _toString(dynamic value) {
+    if (value == null) return '';
+    if (value is String) return value;
+    return value.toString();
+  }
+
+  Map<String, dynamic> _normalizeFoodData(Map<String, dynamic> food) {
+    return {
+      'id': _toString(food['id'] ?? food['name']?.toString().toLowerCase().replaceAll(' ', '_') ?? ''),
+      'nama': _toString(food['nama'] ?? food['name'] ?? ''),
+      'emoji': _toString(food['emoji'] ?? '🍽️'),
+      'kalori_100g': _toDouble(food['kalori_100g'] ?? food['calories'] ?? 0),
+      'karbo_100g': _toDouble(food['karbo_100g'] ?? food['carbs'] ?? 0),
+      'protein_100g': _toDouble(food['protein_100g'] ?? food['protein'] ?? 0),
+      'lemak_100g': _toDouble(food['lemak_100g'] ?? food['fat'] ?? 0),
+      'serat_100g': _toDouble(food['serat_100g'] ?? food['fiber'] ?? 0),
+      'gula_100g': _toDouble(food['gula_100g'] ?? food['sugar'] ?? 0),
+      'kategori': _toString(food['kategori'] ?? food['category'] ?? 'umum'),
+      'indeks_glikemik': _toInt(food['indeks_glikemik'] ?? food['gi'] ?? 50),
+    };
+  }
+
+  // ==================== SEARCH FOOD ====================
   Future<void> _searchFood() async {
     final query = _searchController.text.trim();
+
     if (query.isEmpty) {
       setState(() {
         _searchResults = [];
@@ -68,18 +216,46 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
       });
       return;
     }
-    
-    setState(() => _isSearching = true);
-    
-    final dbHelper = DatabaseHelper.instance;
-    final results = await dbHelper.searchFoods(query);
-    
+
     setState(() {
-      _searchResults = results;
-      _isSearching = false;
+      _isSearching = true;
     });
+
+    try {
+      final results = await ApiService.searchFoods(query);
+
+      print("📦 RAW API RESULT: $results");
+
+      // 🔥 NORMALISASI semua hasil dari API
+      final normalizedResults = results.map((food) {
+        return _normalizeFoodData(food);
+      }).toList();
+
+      print("✅ NORMALIZED RESULTS: $normalizedResults");
+
+      setState(() {
+        _searchResults = normalizedResults;
+        _isSearching = false;
+      });
+    } catch (e) {
+      print("❌ ERROR SEARCH: $e");
+      setState(() {
+        _isSearching = false;
+        _searchResults = [];
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mencari makanan: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
+  // ==================== PHOTO PICKER ====================
   Future<void> _showImageSourceDialog() async {
     showModalBottomSheet(
       context: context,
@@ -123,7 +299,6 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
     );
   }
 
-  // 🔥 Method untuk mengambil foto (sudah termasuk analisis AI)
   Future<void> _ambilFoto(ImageSource source) async {
     try {
       final XFile? foto = await _picker.pickImage(
@@ -132,14 +307,13 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
         maxHeight: 1024,
         imageQuality: 85,
       );
-      
+
       if (foto != null) {
         setState(() {
           _selectedImage = foto;
           _isLoading = true;
         });
-        
-        // 🔥 LANGSUNG ANALISIS FOTO
+
         await _analyzeFoodFromPhoto(foto);
       }
     } catch (e) {
@@ -155,37 +329,45 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
     }
   }
 
-  // 🔥 Method untuk analisis foto dengan AI
+  // ==================== AI FOOD RECOGNITION ====================
   Future<void> _analyzeFoodFromPhoto(XFile photo) async {
     try {
-      File imageFile = File(photo.path);
-      
-      // 🔥 AI mendeteksi makanan dan nutrisi dari foto
-      final result = await _foodService.analyzeFoodFromPhoto(imageFile);
-      
+      final bytes = await photo.readAsBytes();
+      final result = await _foodService.analyzeFoodFromBytes(bytes);
+
       if (result != null && mounted) {
+        // 🔥 NORMALISASI data dari AI
+        final nama = _toString(result['nama']);
+        final kalori = _toDouble(result['kalori']);
+        final karbo = _toDouble(result['karbo']);
+        final protein = _toDouble(result['protein']);
+        final lemak = _toDouble(result['lemak']);
+        final serat = _toDouble(result['serat'] ?? 0);
+        final gula = _toDouble(result['gula'] ?? 0);
+
         setState(() {
-          _searchController.text = result['nama'];
+          _searchController.text = nama;
           _selectedFood = {
-            'id': result['nama'].toLowerCase().replaceAll(' ', '_'),
-            'nama': result['nama'],
-            'emoji': _getEmojiForFood(result['nama']),
-            'kalori_100g': result['kalori'],
-            'karbo_100g': result['karbo'],
-            'protein_100g': result['protein'],
-            'lemak_100g': result['lemak'],
-            'serat_100g': result['serat'] ?? 0,
-            'gula_100g': result['gula'] ?? 0,
-            'kategori': _getCategoryForFood(result['nama']),
-            'indeks_glikemik': _estimateGI(result['karbo']),
+            'id': nama.toLowerCase().replaceAll(' ', '_'),
+            'nama': nama,
+            'emoji': _getEmojiForFood(nama),
+            'kalori_100g': kalori,
+            'karbo_100g': karbo,
+            'protein_100g': protein,
+            'lemak_100g': lemak,
+            'serat_100g': serat,
+            'gula_100g': gula,
+            'kategori': _getCategoryForFood(nama),
+            'indeks_glikemik': _estimateGI(karbo),
           };
           _searchResults = [];
+          _jumlahPorsi = 1;
           _isLoading = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ AI mendeteksi: ${result['nama']} | ${result['kalori'].toInt()} kalori per 100g'),
+            content: Text('✅ AI mendeteksi: $nama | ${kalori.toInt()} kalori per 100g'),
             backgroundColor: const Color(0xFF2979FF),
             duration: const Duration(seconds: 2),
           ),
@@ -200,14 +382,16 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
         );
       }
     } catch (e) {
-      print('Error analyzing food: $e');
+      print('❌ Error analyzing food: $e');
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal menganalisis foto, coba lagi'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menganalisis foto: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
@@ -225,8 +409,15 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
   }
 
   String _getCategoryForFood(String foodName) {
-    if (foodName.contains('Nasi') || foodName.contains('Mie') || foodName.contains('Roti')) return 'makanan_pokok';
-    if (foodName.contains('Ayam') || foodName.contains('Daging') || foodName.contains('Ikan') || foodName.contains('Telur')) return 'protein';
+    if (foodName.contains('Nasi') || foodName.contains('Mie') || foodName.contains('Roti')) {
+      return 'makanan_pokok';
+    }
+    if (foodName.contains('Ayam') ||
+        foodName.contains('Daging') ||
+        foodName.contains('Ikan') ||
+        foodName.contains('Telur')) {
+      return 'protein';
+    }
     if (foodName.contains('Sayur')) return 'sayuran';
     if (foodName.contains('Buah')) return 'buah';
     return 'masakan';
@@ -244,10 +435,16 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
   }
 
   void _pilihMakanan(Map<String, dynamic> food) {
+    // 🔥 Normalisasi ulang sebelum disimpan
+    final normalizedFood = _normalizeFoodData(food);
+
+    print("📦 SELECTED FOOD: $normalizedFood");
+
     setState(() {
-      _selectedFood = food;
-      _searchController.text = food['nama'];
+      _selectedFood = normalizedFood;
+      _searchController.text = normalizedFood['nama'];
       _searchResults = [];
+      _jumlahPorsi = 1;
     });
   }
 
@@ -262,17 +459,17 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
       );
       return;
     }
-    
+
     final imageBytes = await _getImageBytes();
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => FoodAnalysisPage(
-          namaMakanan: _selectedFood!['nama'],
-          waktuMakan: _daftarWaktuMakan[_waktuMakanDipilih]['label'] as String,
-          porsiGram: _porsiGram,
-          foodId: _selectedFood!['id'],
+          namaMakanan: _toString(_selectedFood!['nama']),
+          waktuMakan: _toString(_daftarWaktuMakan[_waktuMakanDipilih]['label']),
+          porsiGram: _gramDariPorsi,
+          foodId: _toString(_selectedFood!['id']),
           imageBytes: imageBytes,
           foodData: _selectedFood,
         ),
@@ -280,6 +477,7 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
     );
   }
 
+  // ==================== UI BUILDERS ====================
   Widget _buildImagePreview() {
     if (_selectedImage == null) {
       return Container(
@@ -326,7 +524,7 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
             ),
           );
         }
-        
+
         if (snapshot.hasError) {
           return Container(
             color: Colors.amber[100],
@@ -342,7 +540,7 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
             ),
           );
         }
-        
+
         return Container(
           color: Colors.amber[100],
           child: const Center(
@@ -415,7 +613,7 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
 
   Widget _buildFotoUpload() {
     final bool hasImage = _selectedImage != null;
-    
+
     return GestureDetector(
       onTap: _showImageSourceDialog,
       child: Container(
@@ -667,6 +865,10 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
   }
 
   Widget _buildPorsiSlider() {
+    final unit = _unitPorsi;
+    final gram = _gramDariPorsi;
+    final maxPorsi = (unit == 'botol') ? 3 : (unit == 'slice') ? 8 : 5;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -674,7 +876,7 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Perkiraan Porsi',
+              'Jumlah Porsi',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E)),
             ),
             Container(
@@ -684,34 +886,102 @@ class _FoodPhotoInputPageState extends State<FoodPhotoInputPage> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                '${_porsiGram.toInt()} gram',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2979FF),
-                ),
+                '~${gram.toInt()} gram',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2979FF)),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        Slider(
-          value: _porsiGram,
-          min: 50,
-          max: 500,
-          divisions: 9,
-          activeColor: const Color(0xFF2979FF),
-          inactiveColor: Colors.grey[300],
-          label: '${_porsiGram.toInt()} gram',
-          onChanged: (value) => setState(() => _porsiGram = value),
-        ),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Kecil', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-            Text('Sedang', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-            Text('Besar', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+            GestureDetector(
+              onTap: () {
+                if (_jumlahPorsi > 1) setState(() => _jumlahPorsi--);
+              },
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: _jumlahPorsi > 1 ? const Color(0xFFEAF2FF) : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: _jumlahPorsi > 1 ? const Color(0xFF2979FF) : Colors.grey[300]!),
+                ),
+                child: Icon(Icons.remove,
+                    size: 18,
+                    color: _jumlahPorsi > 1 ? const Color(0xFF2979FF) : Colors.grey[400]),
+              ),
+            ),
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF2FF),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF2979FF)),
+                ),
+                child: Text(
+                  '$_jumlahPorsi $unit',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2979FF)),
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                if (_jumlahPorsi < maxPorsi) setState(() => _jumlahPorsi++);
+              },
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: _jumlahPorsi < maxPorsi ? const Color(0xFFEAF2FF) : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: _jumlahPorsi < maxPorsi ? const Color(0xFF2979FF) : Colors.grey[300]!),
+                ),
+                child: Icon(Icons.add,
+                    size: 18,
+                    color: _jumlahPorsi < maxPorsi ? const Color(0xFF2979FF) : Colors.grey[400]),
+              ),
+            ),
           ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [1, 2, 3].map((n) {
+            final dipilih = _jumlahPorsi == n;
+            return GestureDetector(
+              onTap: () => setState(() => _jumlahPorsi = n),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+                decoration: BoxDecoration(
+                  color: dipilih ? const Color(0xFF2979FF) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: dipilih ? const Color(0xFF2979FF) : Colors.grey[300]!),
+                ),
+                child: Text(
+                  '$n $unit',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: dipilih ? Colors.white : Colors.grey[600],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 6),
+        Center(
+          child: Text(
+            '1 $unit ≈ ${(_gramPerUnit[unit] ?? 200).toInt()} gram',
+            style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+          ),
         ),
       ],
     );
