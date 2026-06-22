@@ -16,6 +16,13 @@ import 'manual_food_log_page.dart';
 import 'artikel_edukasi_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+enum KondisiGula {
+  rendah,
+  normal,
+  tinggi,
+  sangatTinggi,
+}
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -151,17 +158,17 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   // Ambil kondisi gula darah terbaru
-  _KondisiGula get _kondisiGula {
-    if (_nilaiTerbaru == 0) return _KondisiGula.normal;
-    if (_nilaiTerbaru < 70) return _KondisiGula.rendah;
-    if (_nilaiTerbaru <= 140) return _KondisiGula.normal;
-    if (_nilaiTerbaru <= 180) return _KondisiGula.tinggi;
-    return _KondisiGula.sangatTinggi;
+  KondisiGula get _kondisiGula {
+    if (_nilaiTerbaru == 0) return KondisiGula.normal;
+    if (_nilaiTerbaru < 70) return KondisiGula.rendah;
+    if (_nilaiTerbaru <= 140) return KondisiGula.normal;
+    if (_nilaiTerbaru <= 180) return KondisiGula.tinggi;
+    return KondisiGula.sangatTinggi;
   }
 
   List<Map<String, dynamic>> get _daftarTips {
     switch (_kondisiGula) {
-      case _KondisiGula.rendah:
+      case KondisiGula.rendah:
         return [
           {
             'kategori': '⚠️ Gula Darah Rendah',
@@ -229,7 +236,7 @@ class _DashboardPageState extends State<DashboardPage> {
           },
         ];
 
-      case _KondisiGula.normal:
+      case KondisiGula.normal:
         return [
           {
             'kategori': '✅ Gula Darah Normal',
@@ -301,7 +308,7 @@ class _DashboardPageState extends State<DashboardPage> {
           },
         ];
 
-      case _KondisiGula.tinggi:
+      case KondisiGula.tinggi:
         return [
           {
             'kategori': '⚠️ Gula Darah Tinggi',
@@ -373,7 +380,7 @@ class _DashboardPageState extends State<DashboardPage> {
           },
         ];
 
-      case _KondisiGula.sangatTinggi:
+      case KondisiGula.sangatTinggi:
         return [
           {
             'kategori': '🚨 Gula Darah Sangat Tinggi',
@@ -813,18 +820,18 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildTipsHarian() {
     final kondisi = _kondisiGula;
-    final badgeWarna = kondisi == _KondisiGula.rendah
+    final badgeWarna = kondisi == KondisiGula.rendah
         ? const Color(0xFFF57F17)
-        : kondisi == _KondisiGula.normal
+        : kondisi == KondisiGula.normal
             ? const Color(0xFF2979FF)
-            : kondisi == _KondisiGula.tinggi
+            : kondisi == KondisiGula.tinggi
                 ? const Color(0xFFF4511E)
                 : const Color(0xFFB71C1C);
-    final badgeTeks = kondisi == _KondisiGula.rendah
+    final badgeTeks = kondisi == KondisiGula.rendah
         ? '🔻 Rendah'
-        : kondisi == _KondisiGula.normal
+        : kondisi == KondisiGula.normal
             ? '✅ Normal'
-            : kondisi == _KondisiGula.tinggi
+            : kondisi == KondisiGula.tinggi
                 ? '🔺 Tinggi'
                 : '🚨 Kritis';
     final tips = _daftarTips;
@@ -1230,69 +1237,45 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildEdukasi() {
-    if (isLoadingArtikel) {
-      return const Padding(
-        padding: EdgeInsets.all(20),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Edukasi Kesehatan',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A1A2E),
-            ),
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Edukasi Kesehatan',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1A1A2E),
           ),
-          const SizedBox(height: 10),
-          if (artikelList.isEmpty)
-            Text('Belum ada artikel', style: TextStyle(color: Colors.grey[500]))
-          else
-            ...artikelList.map((artikel) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    )
-                  ],
-                ),
-                child: ListTile(
-                  leading: const Icon(Icons.article_outlined, color: Color(0xFF2979FF)),
-                  title: Text(artikel.judul,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  subtitle: Text(artikel.kategori,
-                      style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-                  trailing: const Icon(Icons.open_in_new),
-                  onTap: () async {
-                    final link = artikel.linkArtikel;
-                    if (link == null || link.isEmpty) return;
+        ),
+        const SizedBox(height: 10),
 
-                    final uri = Uri.tryParse(link);
-                    if (uri == null) return;
-
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    }
-                  },
+        Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ListTile(
+            leading: const Icon(Icons.menu_book, color: Color(0xFF2979FF)),
+            title: const Text(
+              "Buka Artikel Edukasi",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: const Text("Lihat semua artikel kesehatan"),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ArtikelEdukasiPage(),
                 ),
               );
-            }),
-        ],
-      ),
-    );
-  }
+            },
+          ),
+        ),
+      ],
+    ),
+  );
 }
-
-enum _KondisiGula { rendah, normal, tinggi, sangatTinggi }
+}
