@@ -1,278 +1,422 @@
-// ============================================================
-// FILE: admin_beranda_page.dart
-// APLIKASI: DiabеTrack - Panel Admin
-// BAGIAN: Tab 1 - Beranda / Dashboard Admin
-// FUNGSI: Menampilkan statistik total pasien, akun nonaktif,
-//         pasien baru, artikel aktif, aktivitas terbaru,
-//         dan kartu Editorial Insights.
-// ============================================================
-
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
-class AdminBerandaPage extends StatelessWidget {
+class AdminBerandaPage extends StatefulWidget {
   const AdminBerandaPage({super.key});
+
+  @override
+  State<AdminBerandaPage> createState() => _AdminBerandaPageState();
+}
+
+class _AdminBerandaPageState extends State<AdminBerandaPage> {
+  bool _isActive = true;
+  late final Stream<Map<String, dynamic>> _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    _stream = _dashboardStream();
+  }
+
+  @override
+  void dispose() {
+    _isActive = false;
+    super.dispose();
+  }
+
+  Stream<Map<String, dynamic>> _dashboardStream() async* {
+    while (_isActive) {
+      // Fetch terpisah — satu gagal tidak pengaruhi yang lain
+      int totalArtikel = 0;
+      int totalPasien  = 0;
+      List<Map<String, dynamic>> aktivitas = [];
+
+      try {
+        final data = await ApiService.getArtikel();
+        totalArtikel = data.length;
+      } catch (_) {}
+
+      try {
+        final data = await ApiService.getPasien();
+        totalPasien = data.length;
+      } catch (_) {}
+
+      try {
+        final glukosa  = await ApiService.ambilSemuaData();
+        final foodLogs = await ApiService.getFoodLogs();
+
+        final List<Map<String, dynamic>> temp = [];
+
+        for (final g in glukosa.take(5)) {
+          temp.add({
+            'nama' : g['patient_name'] ?? 'Pasien',
+            'info' : 'Catat gula darah: ${g['glucose_level']} mg/dL',
+            'waktu': g['created_at'] ?? '',
+            'warna': const Color(0xFF1A73E8),
+            'ikon' : Icons.water_drop_outlined,
+          });
+        }
+
+        for (final f in foodLogs.take(5)) {
+          temp.add({
+            'nama' : 'Pasien',
+            'info' : 'Catat makanan: ${f['nama_makanan']} (${(f['kalori'] as num?)?.toStringAsFixed(0) ?? '0'} kkal)',
+            'waktu': f['dicatat_pada'] ?? '',
+            'warna': const Color(0xFF26A69A),
+            'ikon' : Icons.restaurant_outlined,
+          });
+        }
+
+        temp.sort((a, b) =>
+            (b['waktu'] as String).compareTo(a['waktu'] as String));
+
+        aktivitas = temp.take(6).toList();
+      } catch (_) {}
+
+      if (_isActive) {
+        yield {
+          'totalArtikel': totalArtikel,
+          'totalPasien' : totalPasien,
+          'aktivitas'   : aktivitas,
+        };
+      }
+
+      await Future.delayed(const Duration(seconds: 10));
+    }
+  }
+
+  String _formatWaktu(String raw) {
+    try {
+      final dt   = DateTime.parse(raw).toLocal();
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 1)  return 'Baru saja';
+      if (diff.inMinutes < 60) return '${diff.inMinutes} mnt lalu';
+      if (diff.inHours < 24)   return '${diff.inHours} jam lalu';
+      return '${diff.inDays} hari lalu';
+    } catch (_) {
+      return '';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: StreamBuilder<Map<String, dynamic>>(
+          stream: _stream,
+          builder: (context, snapshot) {
+            final data      = snapshot.data;
+            final isLoading = !snapshot.hasData;
 
-              // ── Header ──────────────────────────────────────
-              _buildHeader(),
-              const SizedBox(height: 20),
-
-              // ── 4 Kartu Statistik ────────────────────────────
-              _buildGridStatistik(),
-              const SizedBox(height: 20),
-
-              // ── Aktivitas Terbaru ────────────────────────────
-              _buildAktivitasTerbaru(),
-              const SizedBox(height: 16),
-
-              // ── Editorial Insights ───────────────────────────
-              _buildEditorialInsights(),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Header dengan avatar AD dan ikon settings ────────────
-  Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            // Avatar inisial AD
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A73E8),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Center(
-                child: Text(
-                  'AD',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
+            return RefreshIndicator(
+              onRefresh: () async => setState(() {}),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 20),
+                    _buildGridStatistik(data, isLoading),
+                    const SizedBox(height: 20),
+                    _buildAktivitasTerbaru(data, isLoading),
+                    const SizedBox(height: 16),
+                    _buildTipAdmin(),
+                    const SizedBox(height: 24),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'Dashboard',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1A2340),
-              ),
-            ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // ── HEADER (tanpa Live badge) ────────────────────────────
+  Widget _buildHeader() {
+    final jam    = DateTime.now().hour;
+    final sapaan = jam < 11
+        ? 'Selamat Pagi'
+        : jam < 15
+            ? 'Selamat Siang'
+            : jam < 19
+                ? 'Selamat Sore'
+                : 'Selamat Malam';
+
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A73E8),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Center(
+            child: Text('AD',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13)),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(sapaan,
+                style: const TextStyle(
+                    fontSize: 12, color: Color(0xFF90A4AE))),
+            const Text('Admin Panel',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1A2340))),
           ],
         ),
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 8,
-              ),
-            ],
-          ),
-          child: const Icon(Icons.settings_rounded,
-              size: 20, color: Color(0xFF78909C)),
-        ),
       ],
     );
   }
 
-  // ── Grid 4 statistik ─────────────────────────────────────
-  Widget _buildGridStatistik() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 1.6,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      children: [
-        _kartuStat('128', 'TOTAL PASIEN', const Color(0xFF1A73E8)),
-        _kartuStat('6', 'AKUN NONAKTIF', const Color(0xFFFF5252)),
-        _kartuStat('14', 'PASIEN BARU', const Color(0xFF26A69A)),
-        _kartuStat('9', 'ARTIKEL AKTIF', const Color(0xFFFFA726)),
-      ],
-    );
-  }
-
-  Widget _kartuStat(String nilai, String label, Color warna) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            nilai,
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: warna,
-              height: 1,
-            ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF90A4AE),
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Aktivitas terbaru ─────────────────────────────────────
-  Widget _buildAktivitasTerbaru() {
-    final List<Map<String, dynamic>> aktivitas = [
+  // ── 2 KARTU: Artikel + Total Pasien ─────────────────────
+  Widget _buildGridStatistik(Map<String, dynamic>? data, bool isLoading) {
+    final items = [
       {
-        'nama': 'Andi Wijaya',
-        'aksi': 'catat gula darah: 120 mg/dL',
+        'nilai': isLoading ? '...' : '${data!['totalArtikel']}',
+        'label': 'Artikel Aktif',
+        'sub'  : 'Konten edukasi pasien',
         'warna': const Color(0xFF1A73E8),
+        'ikon' : Icons.article_outlined,
       },
       {
-        'nama': 'Sari Putri',
-        'aksi': 'melawatkan pencatatan harian',
-        'warna': const Color(0xFFFFA726),
+        'nilai': isLoading ? '...' : '${data!['totalPasien']}',
+        'label': 'Total Pasien',
+        'sub'  : 'Pengguna terdaftar',
+        'warna': const Color(0xFF26A69A),
+        'ikon' : Icons.people_outline_rounded,
       },
     ];
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'AKTIVITAS TERBARU',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF90A4AE),
-                  letterSpacing: 0.8,
-                ),
-              ),
-              TextButton(
-                onPressed: () {},
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'LIHAT SEMUA',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A73E8),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...aktivitas.map((a) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
+    return Row(
+      children: List.generate(items.length, (idx) {
+        final item = items[idx];
+        return Expanded(
+          child: Container(
+            margin: EdgeInsets.only(
+              right: idx == 0 ? 8 : 0,
+              left : idx == 1 ? 8 : 0,
+            ),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2))
+              ],
+            ),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.only(top: 4),
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: a['warna'] as Color,
-                    shape: BoxShape.circle,
+                    color: (item['warna'] as Color).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  child: Icon(item['ikon'] as IconData,
+                      color: item['warna'] as Color, size: 20),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '${a['nama']}\n',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                            color: Color(0xFF1A2340),
-                          ),
+                const SizedBox(height: 14),
+                isLoading
+                    ? Container(
+                        width: 48,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        TextSpan(
-                          text: a['aksi'],
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF78909C),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                      )
+                    : Text(
+                        item['nilai'] as String,
+                        style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
+                            color: item['warna'] as Color,
+                            height: 1),
+                      ),
+                const SizedBox(height: 4),
+                Text(item['label'] as String,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A2340))),
+                const SizedBox(height: 2),
+                Text(item['sub'] as String,
+                    style: const TextStyle(
+                        fontSize: 10, color: Color(0xFF90A4AE))),
               ],
             ),
-          )),
-        ],
-      ),
+          ),
+        );
+      }),
     );
   }
 
-  // ── Editorial Insights ────────────────────────────────────
-  Widget _buildEditorialInsights() {
+  // ── AKTIVITAS TERBARU ────────────────────────────────────
+bool _expandAktivitas = false;
+
+Widget _buildAktivitasTerbaru(
+    Map<String, dynamic>? data, bool isLoading) {
+  final semuaList =
+      (data?['aktivitas'] as List<Map<String, dynamic>>?) ?? [];
+
+  // Default tampil 3, kalau expand tampil semua (max 6)
+  final list = _expandAktivitas
+      ? semuaList
+      : semuaList.take(3).toList();
+
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+            color: Colors.black.withOpacity(0.05), blurRadius: 8)
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('AKTIVITAS TERBARU',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF90A4AE),
+                    letterSpacing: 0.5)),
+            if (!isLoading && semuaList.length > 3)
+              GestureDetector(
+                onTap: () =>
+                    setState(() => _expandAktivitas = !_expandAktivitas),
+                child: Text(
+                  _expandAktivitas ? 'Sembunyikan' : 'Lihat Semua',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A73E8)),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        if (isLoading)
+          ...List.generate(
+            3,
+            (_) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(10))),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                          width: 120,
+                          height: 10,
+                          color: Colors.grey[200]),
+                      const SizedBox(height: 4),
+                      Container(
+                          width: 180,
+                          height: 10,
+                          color: Colors.grey[100]),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          )
+        else if (semuaList.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: Text('Belum ada aktivitas',
+                  style: TextStyle(
+                      fontSize: 13, color: Color(0xFF90A4AE))),
+            ),
+          )
+        else
+          ...list.map((a) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: (a['warna'] as Color).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(a['ikon'] as IconData,
+                          color: a['warna'] as Color, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(a['nama'] as String,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: Color(0xFF1A2340))),
+                          Text(a['info'] as String,
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF78909C)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      _formatWaktu(a['waktu'] as String),
+                      style: const TextStyle(
+                          fontSize: 10, color: Color(0xFF90A4AE)),
+                    ),
+                  ],
+                ),
+              )),
+      ],
+    ),
+  );
+}
+  Widget _buildTipAdmin() {
+    final tips = [
+      '📊 Pantau pasien dengan rata-rata gula >180 mg/dL setiap hari.',
+      '📝 Artikel baru meningkatkan keterlibatan pasien hingga 40%.',
+      '🥗 Pasien yang catat makanan rutin cenderung lebih terkontrol.',
+      '💧 Ingatkan pasien minum air 8 gelas/hari lewat notifikasi.',
+    ];
+    final tip = tips[DateTime.now().day % tips.length];
+
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF1565C0), Color(0xFF1A73E8)],
@@ -281,48 +425,37 @@ class AdminBerandaPage extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Editorial Insights',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: const Icon(Icons.lightbulb_outline_rounded,
+                color: Colors.white, size: 22),
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'Kelola data klinis dan artikel edukasi pasien dengan efisiensi tinggi melalui dashboard editorial terpadu.',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 34,
-            child: ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFF1A73E8),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-              ),
-              child: const Text(
-                'CEK REAL',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                  letterSpacing: 0.5,
-                ),
-              ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Tips Admin Hari Ini',
+                    style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text(tip,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4)),
+              ],
             ),
           ),
         ],
