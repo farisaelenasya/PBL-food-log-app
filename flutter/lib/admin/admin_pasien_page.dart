@@ -1,30 +1,5 @@
-// ============================================================
-// FILE: admin_pasien_page.dart
-// APLIKASI: DiabеTrack - Panel Admin
-// BAGIAN: Tab 2 - Kelola Pasien
-// FUNGSI: Admin dapat mencari pasien, melihat ringkasan
-//         populasi, daftar pasien dengan badge tipe diabetes,
-//         tombol Nonaktifkan / Aktifkan akun pasien.
-// ============================================================
-
 import 'package:flutter/material.dart';
-
-// Model data pasien
-class DataPasienAdmin {
-  final String inisial;
-  final String nama;
-  final String email;
-  final String tipe;
-  bool aktif;
-
-  DataPasienAdmin({
-    required this.inisial,
-    required this.nama,
-    required this.email,
-    required this.tipe,
-    required this.aktif,
-  });
-}
+import '../services/api_service.dart';
 
 class AdminPasienPage extends StatefulWidget {
   const AdminPasienPage({super.key});
@@ -36,82 +11,143 @@ class AdminPasienPage extends StatefulWidget {
 class _AdminPasienPageState extends State<AdminPasienPage> {
   final _cariCtrl = TextEditingController();
 
-  final List<DataPasienAdmin> _semuaPasien = [
-    DataPasienAdmin(inisial: 'AW', nama: 'Andi Wijaya',  email: 'andi@email.com',    tipe: 'Tipe 2', aktif: true),
-    DataPasienAdmin(inisial: 'SP', nama: 'Sari Putri',   email: 'sari.p@mail.com',   tipe: 'Tipe 1', aktif: true),
-    DataPasienAdmin(inisial: 'BS', nama: 'Budi Santoso', email: 'budi@provider.net', tipe: 'Tipe 2', aktif: false),
-    DataPasienAdmin(inisial: 'DL', nama: 'Dewi Lestari', email: 'dewi@mail.com',     tipe: 'Tipe 2', aktif: true),
-    DataPasienAdmin(inisial: 'RM', nama: 'Rudi Maulana', email: 'rudi@gmail.com',    tipe: 'Tipe 1', aktif: false),
-  ];
+  List<Map<String, dynamic>> _semuaPasien = [];
+  bool _isLoading = true;
 
-  List<DataPasienAdmin> get _filtered {
+  @override
+  void initState() {
+    super.initState();
+    _loadPasien();
+  }
+
+  @override
+  void dispose() {
+    _cariCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── Ambil data pasien dari API — otomatis terisi begitu ──
+  // ── pasien baru mendaftar lewat halaman register mereka ─
+  Future<void> _loadPasien() async {
+    try {
+      final data = await ApiService.getPasien();
+      setState(() {
+        _semuaPasien = data;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('ERROR LOAD PASIEN: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _isLoading = true);
+    await _loadPasien();
+  }
+
+  // ── Helper ambil field dengan aman (nama key bisa beda) ──
+  String _ambilNama(Map<String, dynamic> p) =>
+      (p['nama'] ?? p['name'] ?? p['nama_pasien'] ?? 'Tanpa Nama').toString();
+
+  String _ambilEmail(Map<String, dynamic> p) =>
+      (p['email'] ?? '-').toString();
+
+  String _ambilTipe(Map<String, dynamic> p) =>
+      (p['tipe_diabetes'] ?? p['tipe'] ?? '-').toString();
+
+  String _ambilTanggalDaftar(Map<String, dynamic> p) {
+    final raw = p['created_at'] ?? p['dibuat_pada'] ?? p['tanggal_daftar'];
+    if (raw == null) return '';
+    try {
+      final dt = DateTime.parse(raw.toString()).toLocal();
+      const bulan = [
+        '', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+      ];
+      return '${dt.day} ${bulan[dt.month]} ${dt.year}';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _inisialDari(String nama) {
+    final bagian = nama.trim().split(' ').where((s) => s.isNotEmpty).toList();
+    if (bagian.isEmpty) return '?';
+    if (bagian.length == 1) return bagian[0][0].toUpperCase();
+    return (bagian[0][0] + bagian[1][0]).toUpperCase();
+  }
+
+  List<Map<String, dynamic>> get _filtered {
     if (_cariCtrl.text.isEmpty) return _semuaPasien;
-    return _semuaPasien
-        .where((p) => p.nama.toLowerCase().contains(_cariCtrl.text.toLowerCase()))
-        .toList();
+    final q = _cariCtrl.text.toLowerCase();
+    return _semuaPasien.where((p) {
+      return _ambilNama(p).toLowerCase().contains(q) ||
+          _ambilEmail(p).toLowerCase().contains(q);
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final aktifCount = _semuaPasien.where((p) => p.aktif).length;
-    final persen = (_semuaPasien.isEmpty)
-        ? 0.0
-        : aktifCount / _semuaPasien.length * 100;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: SafeArea(
         child: Column(
           children: [
-
-            // ── AppBar manual ──────────────────────────────
             _buildAppBar(context),
 
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 16),
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Color(0xFF1A73E8)),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 16),
 
-                    // ── Banner biru "Kelola Pasien" ─────────
-                    _buildBannerKelola(),
-                    const SizedBox(height: 16),
+                            // Banner
+                            _buildBannerKelola(),
+                            const SizedBox(height: 16),
 
-                    // ── Search bar ──────────────────────────
-                    _buildSearchBar(),
-                    const SizedBox(height: 12),
+                            // Search bar
+                            _buildSearchBar(),
+                            const SizedBox(height: 16),
 
-                    // ── Tombol Tambah Pasien ────────────────
-                    _buildTombolTambah(context),
-                    const SizedBox(height: 16),
+                            // Ringkasan populasi (total pasien terdaftar otomatis)
+                            _buildRingkasanPopulasi(),
+                            const SizedBox(height: 16),
 
-                    // ── Ringkasan Populasi ──────────────────
-                    _buildRingkasanPopulasi(aktifCount, persen),
-                    const SizedBox(height: 16),
+                            // Label daftar
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'DAFTAR PASIEN TERDAFTAR (${_filtered.length})',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF90A4AE),
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
 
-                    // ── Label daftar ────────────────────────
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'DAFTAR PASIEN TERBARU',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF90A4AE),
-                          letterSpacing: 0.8,
+                            // Daftar pasien atau kosong
+                            if (_filtered.isEmpty)
+                              _buildKosong()
+                            else
+                              ..._filtered.map((p) => _buildKartuPasien(p)),
+
+                            const SizedBox(height: 20),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
-
-                    // ── Daftar pasien ───────────────────────
-                    ..._filtered.map((p) => _buildKartuPasien(p)),
-
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
             ),
           ],
         ),
@@ -134,8 +170,11 @@ class _AdminPasienPageState extends State<AdminPasienPage> {
               color: Color(0xFF1A2340),
             ),
           ),
-          const Icon(Icons.notifications_none_rounded,
-              color: Color(0xFF78909C), size: 24),
+          IconButton(
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh_rounded,
+                color: Color(0xFF78909C), size: 22),
+          ),
         ],
       ),
     );
@@ -153,11 +192,11 @@ class _AdminPasienPageState extends State<AdminPasienPage> {
         ),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           Text(
-            'Kelola Pasien',
+            'Daftar Pasien',
             style: TextStyle(
               color: Colors.white,
               fontSize: 20,
@@ -166,7 +205,7 @@ class _AdminPasienPageState extends State<AdminPasienPage> {
           ),
           SizedBox(height: 6),
           Text(
-            'Monitor dan kelola profil kesehatan seluruh pasien Anda dalam satu dashboard editorial yang presisi.',
+            'Pasien akan muncul otomatis di sini setelah mereka mendaftar akun melalui aplikasi.',
             style: TextStyle(
               color: Colors.white70,
               fontSize: 12,
@@ -183,7 +222,7 @@ class _AdminPasienPageState extends State<AdminPasienPage> {
       controller: _cariCtrl,
       onChanged: (_) => setState(() {}),
       decoration: InputDecoration(
-        hintText: 'Cari nama pasien...',
+        hintText: 'Cari nama atau email pasien...',
         hintStyle: const TextStyle(color: Color(0xFFB0BEC5), fontSize: 13),
         prefixIcon: const Icon(Icons.search_rounded,
             color: Color(0xFFB0BEC5), size: 20),
@@ -207,30 +246,8 @@ class _AdminPasienPageState extends State<AdminPasienPage> {
     );
   }
 
-  Widget _buildTombolTambah(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 46,
-      child: ElevatedButton.icon(
-        onPressed: () => _dialogTambahPasien(context),
-        icon: const Icon(Icons.add_rounded, size: 20),
-        label: const Text(
-          '+ Tambah Pasien',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF1A73E8),
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRingkasanPopulasi(int aktif, double persen) {
+  // ── Ringkasan: total pasien otomatis dari panjang list API ──
+  Widget _buildRingkasanPopulasi() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -238,73 +255,39 @@ class _AdminPasienPageState extends State<AdminPasienPage> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.grey.shade100),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A73E8).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.people_alt_rounded,
+                color: Color(0xFF1A73E8), size: 24),
+          ),
+          const SizedBox(width: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'RINGKASAN POPULASI',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF90A4AE),
-                  letterSpacing: 0.8,
+              Text(
+                '${_semuaPasien.length}',
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1A2340),
+                  height: 1,
                 ),
               ),
-              const Icon(Icons.open_in_new_rounded,
-                  size: 16, color: Color(0xFF90A4AE)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${_semuaPasien.length.toString().padLeft(4, ' ')}',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1A2340),
-                      letterSpacing: -1,
-                    ),
-                  ),
-                  const Text(
-                    'TOTAL PASIEN',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF90A4AE),
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 32),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${persen.toStringAsFixed(1)}%',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1A73E8),
-                      letterSpacing: -1,
-                    ),
-                  ),
-                  const Text(
-                    'TINGKAT AKTIVITAS',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF90A4AE),
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ],
+              const Text(
+                'TOTAL PASIEN TERDAFTAR',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF90A4AE),
+                  letterSpacing: 0.5,
+                ),
               ),
             ],
           ),
@@ -313,7 +296,31 @@ class _AdminPasienPageState extends State<AdminPasienPage> {
     );
   }
 
-  Widget _buildKartuPasien(DataPasienAdmin p) {
+  Widget _buildKosong() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      child: Column(
+        children: [
+          Icon(Icons.people_outline_rounded, size: 56, color: Colors.grey[300]),
+          const SizedBox(height: 10),
+          Text(
+            _cariCtrl.text.isEmpty
+                ? 'Belum ada pasien yang mendaftar'
+                : 'Pasien tidak ditemukan',
+            style: TextStyle(color: Colors.grey[400], fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Kartu pasien: hanya info, tanpa toggle aktif/nonaktif ──
+  Widget _buildKartuPasien(Map<String, dynamic> p) {
+    final nama  = _ambilNama(p);
+    final email = _ambilEmail(p);
+    final tipe  = _ambilTipe(p);
+    final tgl   = _ambilTanggalDaftar(p);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -334,7 +341,7 @@ class _AdminPasienPageState extends State<AdminPasienPage> {
             ),
             child: Center(
               child: Text(
-                p.inisial,
+                _inisialDari(nama),
                 style: const TextStyle(
                   color: Color(0xFF1A73E8),
                   fontWeight: FontWeight.w800,
@@ -351,7 +358,7 @@ class _AdminPasienPageState extends State<AdminPasienPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  p.nama,
+                  nama,
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -360,204 +367,49 @@ class _AdminPasienPageState extends State<AdminPasienPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${p.email} • ${p.tipe}',
+                  '$email • $tipe',
                   style: const TextStyle(
                     fontSize: 11,
                     color: Color(0xFF90A4AE),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    // Badge status aktif/nonaktif
-                    _badgeStatus(p.aktif),
-                    const SizedBox(width: 8),
-                    // Tombol toggle
-                    GestureDetector(
-                      onTap: () => setState(() => p.aktif = !p.aktif),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: p.aktif
-                              ? const Color(0xFFFFEBEE)
-                              : const Color(0xFFE3F2FD),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          p.aktif ? 'Nonaktifkan' : 'Aktifkan',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: p.aktif
-                                ? const Color(0xFFE53935)
-                                : const Color(0xFF1A73E8),
-                          ),
-                        ),
+                if (tgl.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today_outlined,
+                          size: 11, color: Colors.grey[400]),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Bergabung $tgl',
+                        style: const TextStyle(
+                            fontSize: 10, color: Color(0xFF90A4AE)),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
 
-  Widget _badgeStatus(bool aktif) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: aktif
-            ? const Color(0xFFE8F5E9)
-            : const Color(0xFFEEEEEE),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        aktif ? 'AKTIF' : 'NONAKTIF',
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: aktif ? const Color(0xFF43A047) : Colors.grey,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
-  // Dialog tambah pasien baru
-  void _dialogTambahPasien(BuildContext context) {
-    final namaCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
-    String tipe = 'Tipe 2';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setModalState) => Container(
-          padding: EdgeInsets.fromLTRB(
-              20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
+          // Badge "Terdaftar" — statis, tanpa interaksi
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5E9),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text(
+              'Terdaftar',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF43A047),
+                letterSpacing: 0.3,
+              ),
             ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Tambah Pasien Baru',
-                style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A2340)),
-              ),
-              const SizedBox(height: 16),
-              _inputField(namaCtrl, 'Nama Lengkap', Icons.person_rounded),
-              const SizedBox(height: 12),
-              _inputField(emailCtrl, 'Email', Icons.email_rounded,
-                  keyboard: TextInputType.emailAddress),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: tipe,
-                decoration: InputDecoration(
-                  labelText: 'Tipe Diabetes',
-                  prefixIcon: const Icon(Icons.medical_information_rounded,
-                      color: Color(0xFF1A73E8), size: 20),
-                  filled: true,
-                  fillColor: const Color(0xFFF0F4FF),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
-                ),
-                items: ['Tipe 1', 'Tipe 2', 'Pra-Diabetes']
-                    .map((t) =>
-                        DropdownMenuItem(value: t, child: Text(t)))
-                    .toList(),
-                onChanged: (v) => setModalState(() => tipe = v!),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    if (namaCtrl.text.trim().isNotEmpty) {
-                      final inisial = namaCtrl.text
-                          .trim()
-                          .split(' ')
-                          .take(2)
-                          .map((w) => w[0].toUpperCase())
-                          .join();
-                      setState(() {
-                        _semuaPasien.add(DataPasienAdmin(
-                          inisial: inisial,
-                          nama: namaCtrl.text.trim(),
-                          email: emailCtrl.text.trim(),
-                          tipe: tipe,
-                          aktif: true,
-                        ));
-                      });
-                      Navigator.pop(context);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A73E8),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('Simpan',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 15)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _inputField(
-    TextEditingController ctrl,
-    String label,
-    IconData icon, {
-    TextInputType keyboard = TextInputType.text,
-  }) {
-    return TextField(
-      controller: ctrl,
-      keyboardType: keyboard,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: const Color(0xFF1A73E8), size: 20),
-        filled: true,
-        fillColor: const Color(0xFFF0F4FF),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: Color(0xFF1A73E8), width: 1.5)),
+        ],
       ),
     );
   }
