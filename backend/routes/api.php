@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\FoodLogController;
 use App\Http\Controllers\Api\FoodVisionController;
 use App\Http\Controllers\Api\PointController;
 use App\Http\Controllers\Api\ArtikelController;
+use App\Http\Controllers\Api\UserController;
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('medications', MedicationController::class);
@@ -40,3 +41,6 @@ Route::get('/points/history', [FoodLogController::class, 'pointHistory']);
 Route::get('/artikel', [ArtikelController::class, 'index']);
 Route::post('/artikel', [ArtikelController::class, 'store']);
 Route::delete('/artikel/{id}', [ArtikelController::class, 'destroy']);
+
+// USER
+Route::get('/users', [UserController::class, 'index']);
