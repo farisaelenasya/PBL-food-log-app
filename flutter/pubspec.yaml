@@ -17,9 +17,8 @@ dependencies:
   # UI
   cupertino_icons: ^1.0.8
 
-  # Database & Storage
-  sqflite: ^2.3.3
-  path: ^1.9.0
+  # Storage
+
   shared_preferences: ^2.3.3
 
   # Image & Camera
