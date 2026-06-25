@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../database/database_helper.dart';
 import '../services/api_service.dart';
 import 'package:intl/date_symbol_data_local.dart';
+
 class MealHistoryPage extends StatefulWidget {
   const MealHistoryPage({super.key});
 
@@ -17,8 +17,7 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
   double _totalKalori = 0;
   double _totalKarbo = 0;
   double _totalGula = 0;
-  
-  // ✅ TAMBAHAN: variabel untuk kontrol peringatan gula
+
   bool _peringatanSudahMuncul = false;
   String _tanggalPeringatan = '';
 
@@ -31,7 +30,6 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
   }
 
   Future<void> _loadRiwayat() async {
-    // ✅ TAMBAHAN: reset flag peringatan kalau sudah hari baru
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     if (_tanggalPeringatan != today) {
       _tanggalPeringatan = today;
@@ -42,7 +40,6 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
 
     try {
       final rawList = await ApiService.getFoodLogs();
-
       final List<Map<String, dynamic>> fixedList =
           List<Map<String, dynamic>>.from(rawList);
 
@@ -50,37 +47,27 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
       double totalKarbo = 0;
       double totalGula = 0;
 
-      // ✅ GANTI: hitung gula hanya dari entri hari ini
-     for (final r in fixedList) {
-  final kalori =
-      double.tryParse((r['kalori'] ?? 0).toString()) ?? 0;
+      for (final r in fixedList) {
+        final kalori = double.tryParse((r['kalori'] ?? 0).toString()) ?? 0;
+        final karbo  = double.tryParse((r['karbo'] ?? 0).toString()) ?? 0;
+        final gula   = double.tryParse((r['gula'] ?? 0).toString()) ?? 0;
+        final tanggal = r['dicatat_pada']?.toString().substring(0, 10) ?? '';
 
-  final karbo =
-      double.tryParse((r['karbo'] ?? 0).toString()) ?? 0;
-
-  final gula =
-      double.tryParse((r['gula'] ?? 0).toString()) ?? 0;
-
-  final tanggal =
-      r['dicatat_pada']?.toString().substring(0, 10) ?? '';
-
-  // HANYA HITUNG DATA HARI INI
-  if (tanggal == today) {
-    totalKal += kalori;
-    totalKarbo += karbo;
-    totalGula += gula;
-  }
-}
+        if (tanggal == today) {
+          totalKal   += kalori;
+          totalKarbo += karbo;
+          totalGula  += gula;
+        }
+      }
 
       setState(() {
-        _riwayat = fixedList;
-        _totalKalori = totalKal;
-        _totalKarbo = totalKarbo;
-        _totalGula = totalGula;
-        _isLoading = false;
+        _riwayat      = fixedList;
+        _totalKalori  = totalKal;
+        _totalKarbo   = totalKarbo;
+        _totalGula    = totalGula;
+        _isLoading    = false;
       });
 
-      // ✅ TAMBAHAN: tampilkan peringatan kalau gula melebihi batas
       if (totalGula > _batasGulaHarian && !_peringatanSudahMuncul) {
         _peringatanSudahMuncul = true;
         Future.delayed(Duration.zero, () {
@@ -143,8 +130,7 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
                   const SizedBox(height: 6),
                   _barisInfo('Penderita diabetes', '≤ 25g/hari',
                       const Color(0xFFE53935)),
-                  _barisInfo(
-                      'Orang normal', '≤ 50g/hari', Colors.orange),
+                  _barisInfo('Orang normal', '≤ 50g/hari', Colors.orange),
                   const SizedBox(height: 6),
                   Text(
                     'Total kamu hari ini: ${totalGula.toStringAsFixed(1)}g',
@@ -159,8 +145,7 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
             const SizedBox(height: 12),
             const Text(
               'Tips: Kurangi makanan manis, minuman bergula, dan buah tinggi gula untuk sisa hari ini.',
-              style:
-                  TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
+              style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
             ),
           ],
         ),
@@ -169,8 +154,7 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Mengerti',
                 style: TextStyle(
-                    color: Color(0xFF2979FF),
-                    fontWeight: FontWeight.bold)),
+                    color: Color(0xFF2979FF), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -186,9 +170,7 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
               style: TextStyle(fontSize: 11, color: Colors.grey[700])),
           Text(nilai,
               style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: warna)),
+                  fontSize: 11, fontWeight: FontWeight.bold, color: warna)),
         ],
       ),
     );
@@ -197,13 +179,13 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
   String _formatWaktu(String? dicatatPada, String? waktuMakan) {
     if (dicatatPada == null) return waktuMakan ?? '-';
     try {
-      final dt = DateTime.parse(dicatatPada);
-      final now = DateTime.now();
-      final today = DateFormat('yyyy-MM-dd').format(now);
+      final dt        = DateTime.parse(dicatatPada);
+      final now       = DateTime.now();
+      final today     = DateFormat('yyyy-MM-dd').format(now);
       final yesterday = DateFormat('yyyy-MM-dd')
           .format(now.subtract(const Duration(days: 1)));
-      final logDate = DateFormat('yyyy-MM-dd').format(dt);
-      final jam = DateFormat('HH:mm').format(dt);
+      final logDate   = DateFormat('yyyy-MM-dd').format(dt);
+      final jam       = DateFormat('HH:mm').format(dt);
       String hari;
       if (logDate == today) hari = 'Hari ini';
       else if (logDate == yesterday) hari = 'Kemarin';
@@ -213,75 +195,57 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
       return waktuMakan ?? '-';
     }
   }
+
   List<Map<String, dynamic>> get _filteredRiwayat {
-  final now = DateTime.now();
-  
-  if (_selectedTab == 0) {
-    // Hari ini
+    final now = DateTime.now();
+    if (_selectedTab == 0) {
+      return _riwayat.where((item) {
+        final tanggal = DateTime.tryParse(item['dicatat_pada']?.toString() ?? '');
+        if (tanggal == null) return false;
+        return tanggal.year == now.year &&
+            tanggal.month == now.month &&
+            tanggal.day == now.day;
+      }).toList();
+    }
+    if (_selectedTab == 1) {
+      final mingguLalu = now.subtract(const Duration(days: 7));
+      return _riwayat.where((item) {
+        final tanggal = DateTime.tryParse(item['dicatat_pada']?.toString() ?? '');
+        if (tanggal == null) return false;
+        return tanggal.isAfter(mingguLalu);
+      }).toList();
+    }
     return _riwayat.where((item) {
-      final tanggal =
-          DateTime.tryParse(item['dicatat_pada']?.toString() ?? '');
-
+      final tanggal = DateTime.tryParse(item['dicatat_pada']?.toString() ?? '');
       if (tanggal == null) return false;
-
-      return tanggal.year == now.year &&
-          tanggal.month == now.month &&
-          tanggal.day == now.day;
-    }).toList();
-  }
-  
-  if (_selectedTab == 1) {
-    // 7 hari terakhir
-    final mingguLalu = now.subtract(const Duration(days: 7));
-
-    return _riwayat.where((item) {
-      final tanggal =
-          DateTime.tryParse(item['dicatat_pada']?.toString() ?? '');
-
-      if (tanggal == null) return false;
-
-      return tanggal.isAfter(mingguLalu);
+      return tanggal.month == now.month && tanggal.year == now.year;
     }).toList();
   }
 
-  // Bulan ini
-  return _riwayat.where((item) {
-    final tanggal =
-        DateTime.tryParse(item['dicatat_pada']?.toString() ?? '');
-
-    if (tanggal == null) return false;
-
-    return tanggal.month == now.month &&
-        tanggal.year == now.year;
-  }).toList();
-}
-Map<String, List<Map<String, dynamic>>> get _groupedRiwayat {
-  final Map<String, List<Map<String, dynamic>>> grouped = {};
-
-  for (final item in _filteredRiwayat) {
-    final dicatatPada = item['dicatat_pada']?.toString() ?? '';
-
-    final tanggal =
-        dicatatPada.length >= 10 ? dicatatPada.substring(0, 10) : 'Tidak diketahui';
-
-    grouped.putIfAbsent(tanggal, () => []);
-    grouped[tanggal]!.add(item);
+  Map<String, List<Map<String, dynamic>>> get _groupedRiwayat {
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final item in _filteredRiwayat) {
+      final dicatatPada = item['dicatat_pada']?.toString() ?? '';
+      final tanggal = dicatatPada.length >= 10
+          ? dicatatPada.substring(0, 10)
+          : 'Tidak diketahui';
+      grouped.putIfAbsent(tanggal, () => []);
+      grouped[tanggal]!.add(item);
+    }
+    return grouped;
   }
 
-  return grouped;
-}
   @override
   Widget build(BuildContext context) {
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final entriHariIni = _riwayat.where((r) {
-  final tanggal = r['dicatat_pada']?.toString() ?? '';
-  if (tanggal.length < 10) return false;
+      final tanggal = r['dicatat_pada']?.toString() ?? '';
+      if (tanggal.length < 10) return false;
+      return tanggal.substring(0, 10) == today;
+    }).length;
 
-  return tanggal.substring(0, 10) == today;
-}).length;
-    final persenGula =
-        (_totalGula / _batasGulaHarian).clamp(0.0, 1.0);
-    final gulaLewat = _totalGula > _batasGulaHarian;
+    final persenGula = (_totalGula / _batasGulaHarian).clamp(0.0, 1.0);
+    final gulaLewat  = _totalGula > _batasGulaHarian;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
@@ -327,15 +291,12 @@ Map<String, List<Map<String, dynamic>>> get _groupedRiwayat {
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
                             _buildRingkasan(
-                                _totalKalori.toStringAsFixed(0),
-                                'Total Kalori'),
+                                _totalKalori.toStringAsFixed(0), 'Total Kalori'),
                             _buildPemisah(),
                             _buildRingkasan(
-                                '${_totalKarbo.toStringAsFixed(0)}g',
-                                'Total Karbo'),
+                                '${_totalKarbo.toStringAsFixed(0)}g', 'Total Karbo'),
                             _buildPemisah(),
-                            _buildRingkasan(
-                                '$entriHariIni', 'Entri Hari Ini'),
+                            _buildRingkasan('$entriHariIni', 'Entri Hari Ini'),
                           ],
                         ),
                       ),
@@ -360,8 +321,7 @@ Map<String, List<Map<String, dynamic>>> get _groupedRiwayat {
                           children: [
                             Row(
                               children: [
-                                const Text('🍬',
-                                    style: TextStyle(fontSize: 18)),
+                                const Text('🍬', style: TextStyle(fontSize: 18)),
                                 const SizedBox(width: 8),
                                 const Text('Total Gula Hari Ini',
                                     style: TextStyle(
@@ -382,8 +342,7 @@ Map<String, List<Map<String, dynamic>>> get _groupedRiwayat {
                                 if (gulaLewat) ...[
                                   const SizedBox(width: 6),
                                   GestureDetector(
-                                    onTap: () =>
-                                        _showPeringatanGula(_totalGula),
+                                    onTap: () => _showPeringatanGula(_totalGula),
                                     child: const Text('⚠️',
                                         style: TextStyle(fontSize: 16)),
                                   ),
@@ -438,102 +397,89 @@ Map<String, List<Map<String, dynamic>>> get _groupedRiwayat {
                     const SizedBox(height: 10),
 
                     _buildTabFilter(),
-
                     const SizedBox(height: 10),
-                   Expanded(
-  child: RefreshIndicator(
-    onRefresh: _loadRiwayat,
-    child: ListView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 8,
-      ),
-      children: _groupedRiwayat.entries.map((entry) {
-        final tanggal = entry.key;
-        final makanan = entry.value;
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: ExpansionTile(
-            title: Text(
-              '$tanggal (${makanan.length} makanan)',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            children: makanan.map((item) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                ),
-                child: _buildItemRiwayat(
-                  context,
-                  item,
-                ),
-              );
-            }).toList(),
-          ),
-        );
-      }).toList(),
-    ),
-  ),
-),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _loadRiwayat,
+                        child: ListView(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          children: _groupedRiwayat.entries.map((entry) {
+                            final tanggal = entry.key;
+                            final makanan = entry.value;
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                              child: ExpansionTile(
+                                title: Text(
+                                  '$tanggal (${makanan.length} makanan)',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                children: makanan
+                                    .map((item) => Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10),
+                                          child: _buildItemRiwayat(
+                                              context, item),
+                                        ))
+                                    .toList(),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
     );
   }
+
   Widget _buildTabFilter() {
-  return Container(
-    margin: const EdgeInsets.symmetric(horizontal: 16),
-    decoration: BoxDecoration(
-      color: Colors.grey.shade200,
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      children: [
-        _tabItem('Hari', 0),
-        _tabItem('Minggu', 1),
-        _tabItem('Bulan', 2),
-      ],
-    ),
-  );
-}
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          _tabItem('Hari', 0),
+          _tabItem('Minggu', 1),
+          _tabItem('Bulan', 2),
+        ],
+      ),
+    );
+  }
 
-Widget _tabItem(String title, int index) {
-  final aktif = _selectedTab == index;
-
-  return Expanded(
-    child: GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTab = index;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: aktif ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(
-          child: Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: aktif
-                  ? const Color(0xFF2979FF)
-                  : Colors.grey,
+  Widget _tabItem(String title, int index) {
+    final aktif = _selectedTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTab = index),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: aktif ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: aktif ? const Color(0xFF2979FF) : Colors.grey,
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
+
   Widget _buildKosong() {
     return Center(
       child: Column(
@@ -564,36 +510,28 @@ Widget _tabItem(String title, int index) {
                 color: Colors.white)),
         const SizedBox(height: 2),
         Text(label,
-            style: TextStyle(
-                fontSize: 10,
-                color: Colors.white.withValues(alpha: 0.8))),
+            style:
+                TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.8))),
       ],
     );
   }
 
-  Widget _buildPemisah() => Container(
-      width: 1, height: 32, color: Colors.white.withValues(alpha: 0.3));
+  Widget _buildPemisah() =>
+      Container(width: 1, height: 32, color: Colors.white.withValues(alpha: 0.3));
 
-  Widget _buildItemRiwayat(
-      BuildContext context, Map<String, dynamic> item) {
-    final double karbo =
-        double.tryParse(item['karbo']?.toString() ?? '0') ?? 0;
-    final double kalori =
-        double.tryParse(item['kalori']?.toString() ?? '0') ?? 0;
-    final double gula =
-        double.tryParse(item['gula']?.toString() ?? '0') ?? 0;
+  Widget _buildItemRiwayat(BuildContext context, Map<String, dynamic> item) {
+    final double karbo  = double.tryParse(item['karbo']?.toString() ?? '0') ?? 0;
+    final double kalori = double.tryParse(item['kalori']?.toString() ?? '0') ?? 0;
+    final double gula   = double.tryParse(item['gula']?.toString() ?? '0') ?? 0;
 
-    final bool karboTinggi = karbo > 40;
     final bool gulaTinggi = gula > 10;
 
-    // ✅ FIX nama makanan: coba beberapa key sekaligus
     final String nama = (item['nama_makanan'] ??
             item['nama'] ??
             item['name'] ??
             'Makanan')
         .toString();
-
-    final String emoji = item['emoji']?.toString() ?? '🍽';
+    final String emoji    = item['emoji']?.toString() ?? '🍽';
     final String waktuStr = _formatWaktu(
       item['dicatat_pada']?.toString(),
       item['waktu_makan']?.toString(),
@@ -623,8 +561,7 @@ Widget _tabItem(String title, int index) {
                   color: warna.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12)),
               child: Center(
-                  child: Text(emoji,
-                      style: const TextStyle(fontSize: 22))),
+                  child: Text(emoji, style: const TextStyle(fontSize: 22))),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -658,8 +595,7 @@ Widget _tabItem(String title, int index) {
                   ),
                   const SizedBox(height: 3),
                   Text(waktuStr,
-                      style:
-                          TextStyle(fontSize: 11, color: Colors.grey[500])),
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500])),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
@@ -668,12 +604,9 @@ Widget _tabItem(String title, int index) {
                       _chipNutrisi('${kalori.toStringAsFixed(0)} kkal',
                           const Color(0xFF2979FF)),
                       _chipNutrisi('${karbo.toStringAsFixed(0)}g karbo',
-                          karboTinggi
-                              ? const Color(0xFFE65100)
-                              : Colors.green),
+                          Colors.green),
                       if (gula > 0)
-                        _chipNutrisi(
-                            '${gula.toStringAsFixed(1)}g gula',
+                        _chipNutrisi('${gula.toStringAsFixed(1)}g gula',
                             gulaTinggi
                                 ? const Color(0xFFE53935)
                                 : Colors.orange),
@@ -682,7 +615,6 @@ Widget _tabItem(String title, int index) {
                 ],
               ),
             ),
-            
           ],
         ),
       ),
@@ -692,10 +624,10 @@ Widget _tabItem(String title, int index) {
   Color _warnaWaktu(String? waktu) {
     switch (waktu) {
       case 'Sarapan': return const Color(0xFFFF8C00);
-      case 'Siang': return const Color(0xFF2979FF);
-      case 'Malam': return Colors.indigo;
+      case 'Siang':   return const Color(0xFF2979FF);
+      case 'Malam':   return Colors.indigo;
       case 'Cemilan': return Colors.green;
-      default: return const Color(0xFF2979FF);
+      default:        return const Color(0xFF2979FF);
     }
   }
 
@@ -708,41 +640,7 @@ Widget _tabItem(String title, int index) {
       ),
       child: Text(teks,
           style: TextStyle(
-              fontSize: 10,
-              color: warna,
-              fontWeight: FontWeight.w600)),
+              fontSize: 10, color: warna, fontWeight: FontWeight.w600)),
     );
-  }
-
-  Future<void> _konfirmasiHapus(String id) async {
-    if (id.isEmpty) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Entri'),
-        content:
-            const Text('Yakin ingin menghapus catatan makanan ini?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Batal')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Hapus',
-                style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      await DatabaseHelper.instance.deleteFoodLog(id);
-      // ✅ Reset flag peringatan setelah hapus supaya bisa muncul lagi
-      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      if (_tanggalPeringatan != today) {
-        _tanggalPeringatan = today;
-        _peringatanSudahMuncul = false;
-      }
-      _loadRiwayat();
-    }
   }
 }
