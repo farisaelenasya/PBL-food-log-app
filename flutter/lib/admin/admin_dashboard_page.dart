@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../pages/login_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {   // ← ubah dari AdminBerandaPage
   const AdminDashboardPage({super.key});
@@ -98,6 +100,40 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+Future<void> _logout() async {
+  final konfirm = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Logout'),
+      content: const Text('Yakin ingin keluar dari Admin Panel?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Logout',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+        ),
+      ],
+    ),
+  );
+
+  if (konfirm != true) return;
+
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.clear();
+
+  if (!mounted) return;
+  Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(builder: (_) => const LoginPage()),
+    (_) => false,
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -176,6 +212,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF1A2340))),
           ],
+        ),
+        const Spacer(),
+        IconButton(
+          onPressed: _logout,
+        icon: const Icon(Icons.logout_rounded),
+        color: const Color(0xFFE53935),
+        tooltip: 'Logout',
         ),
       ],
     );

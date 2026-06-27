@@ -8,6 +8,7 @@ import 'blood_sugar_analysis_page.dart';
 import 'meal_history_page.dart';
 import 'food_photo_input_page.dart';
 import '../services/api_config.dart';
+import 'login_page.dart';
 
 
 class HealthProfilePage extends StatefulWidget {
@@ -92,6 +93,40 @@ class _HealthProfilePageState extends State<HealthProfilePage> {
       return tgl;
     }
   }
+
+Future<void> _logout() async {
+  final konfirm = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Keluar'),
+      content: const Text('Yakin ingin keluar dari akun?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Keluar',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+        ),
+      ],
+    ),
+  );
+
+  if (konfirm != true) return;
+
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.clear();
+
+  if (!mounted) return;
+  Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(builder: (_) => const LoginPage()),
+    (_) => false,
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -226,6 +261,26 @@ class _HealthProfilePageState extends State<HealthProfilePage> {
                 label: const Text('Ubah Informasi Profil',
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+            ),
+          ),
+           const SizedBox(height: 12), // ← tambah ini
+          Padding(                    // ← tambah ini sampai bawah
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _logout,
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                label: const Text('Keluar',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
           ),
