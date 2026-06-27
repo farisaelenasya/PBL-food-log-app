@@ -2,14 +2,19 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../models/artikel_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost:8000/api'; // web chrome
-    } else {
-      return 'http://10.0.2.2:8000/api'; // android emulator
-    }
+  static const String baseUrl = 'http://192.168.1.3:8000/api';
+  
+  static Future<Map<String, String>> _authHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token') ?? '';
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
   }
 
   /// Kirim data gula darah ke Laravel
@@ -18,14 +23,11 @@ class ApiService {
     required int glucoseLevel,
   }) async {
     try {
+      final headers = await _authHeaders();
       final response = await http.post(
         Uri.parse('$baseUrl/glucoses'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        headers: headers,
         body: jsonEncode({
-          'patient_name': patientName,
           'glucose_level': glucoseLevel,
         }),
       );
@@ -38,9 +40,10 @@ class ApiService {
   /// Ambil 7 data gula darah terbaru
   static Future<List<double>> ambilData7Hari() async {
     try {
+      final headers = await _authHeaders();
       final response = await http.get(
         Uri.parse('$baseUrl/glucoses'),
-        headers: {'Accept': 'application/json'},
+        headers: headers,
       );
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
@@ -56,12 +59,13 @@ class ApiService {
     return [88, 102, 97, 142, 118, 125, 131];
   }
 
-  /// Ambil semua data dengan created_at untuk keperluan mingguan/bulanan
+ /// Ambil semua data dengan created_at untuk keperluan mingguan/bulanan
   static Future<List<Map<String, dynamic>>> ambilSemuaData() async {
     try {
+      final headers = await _authHeaders();
       final response = await http.get(
         Uri.parse('$baseUrl/glucoses'),
-        headers: {'Accept': 'application/json'},
+        headers: headers,
       );
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
@@ -82,7 +86,7 @@ class ApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/users'),
-        headers: {'Accept': 'application/json'},
+        headers: await _authHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -96,6 +100,47 @@ class ApiService {
       }
     } catch (e) {
       debugPrint('ApiService getPasien error: $e');
+    }
+    return [];
+  }
+
+/// ADMIN: Ambil daftar pasien (role = 'user') untuk monitoring
+  /// Backend: GET /api/admin/patients → AdminController@patients
+  static Future<List<Map<String, dynamic>>> getAdminPatients() async {
+    try {
+      final headers = await _authHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/admin/patients'),
+        headers: headers,
+      );
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final List list = json['data'];
+        return list.map((e) => Map<String, dynamic>.from(e)).toList();
+      }
+    } catch (e) {
+      debugPrint('getAdminPatients error: $e');
+    }
+    return [];
+  }
+
+  /// ADMIN: Ambil data gula darah milik 1 pasien tertentu
+  /// Backend: GET /api/admin/patients/{id}/glucose → AdminController@patientGlucose
+  static Future<List<Map<String, dynamic>>> getAdminPatientGlucose(
+      int patientId) async {
+    try {
+      final headers = await _authHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/admin/patients/$patientId/glucose'),
+        headers: headers,
+      );
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final List list = json['data'];
+        return list.map((e) => Map<String, dynamic>.from(e)).toList();
+      }
+    } catch (e) {
+      debugPrint('getAdminPatientGlucose error: $e');
     }
     return [];
   }
@@ -207,6 +252,7 @@ class ApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/points'),
+        headers: await _authHeaders(),
       );
 
       debugPrint('=== POINTS RESPONSE ===');
@@ -255,7 +301,6 @@ class ApiService {
     }
   }
 
- 
   static Future<bool> tambahArtikel({
     required String judul,
     required String kategori,
@@ -302,7 +347,6 @@ class ApiService {
     }
   }
 
-  
   //lihat catatan di ArtikelController.
   static Future<List<ArtikelModel>> getArtikel() async {
     try {
@@ -318,7 +362,6 @@ class ApiService {
         final json = jsonDecode(response.body);
         final data = json['data'];
 
-       
         if (data is Map<String, dynamic>) {
           return [ArtikelModel.fromJson(data)];
         }

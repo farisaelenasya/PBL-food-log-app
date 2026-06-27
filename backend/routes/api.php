@@ -11,20 +11,22 @@ use App\Http\Controllers\Api\FoodVisionController;
 use App\Http\Controllers\Api\PointController;
 use App\Http\Controllers\Api\ArtikelController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\AdminController;
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('medications', MedicationController::class);
     Route::get('profile', [ProfileController::class, 'show']);
     Route::put('profile', [ProfileController::class, 'update']);
     Route::post('/profile', [ProfileController::class, 'update']);
+    Route::apiResource('glucoses', GlucoseController::class);
+    Route::apiResource('admin/patients', AdminController::class);
+    Route::get('/admin/patients/{id}/glucose', [AdminController::class, 'patientGlucose']);
 });
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/kirim-otp', [AuthController::class, 'kirimOtp']);
 Route::post('/verifikasi-otp', [AuthController::class, 'verifikasiOtp']);
-
-Route::apiResource('glucoses', GlucoseController::class);
 
 Route::get('/foods', [FoodController::class, 'all']);
 Route::get('/foods/search', [FoodController::class, 'search']);

@@ -3,8 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http; 
 import 'dart:convert';
 import 'login_page.dart';
-import 'dashboard_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api_config.dart';
+
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -94,7 +95,7 @@ class _RegisterPageState extends State<RegisterPage> {
   setState(() => _sedangMemuat = true);
   try {
     final response = await http.post(
-      Uri.parse('http://10.0.2.2:8000/api/kirim-otp'),
+      Uri.parse('${ApiConfig.baseUrl}/kirim-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': _emailCtrl.text.trim()}),
     );
@@ -133,7 +134,7 @@ class _RegisterPageState extends State<RegisterPage> {
   try {
     // Verifikasi OTP dulu
     final otpRes = await http.post(
-      Uri.parse('http://10.0.2.2:8000/api/verifikasi-otp'),
+      Uri.parse('${ApiConfig.baseUrl}/verifikasi-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'email': _emailCtrl.text.trim(),
@@ -154,7 +155,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     // OTP valid → register ke API
     final regRes = await http.post(
-      Uri.parse('http://10.0.2.2:8000/api/register'),
+      Uri.parse('${ApiConfig.baseUrl}/register'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'name'          : _namaCtrl.text.trim(),
@@ -188,7 +189,7 @@ class _RegisterPageState extends State<RegisterPage> {
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const DashboardPage()),
+        MaterialPageRoute(builder: (_) => const LoginPage()),
       );
     } else {
       _snackbar(regData['message'] ?? 'Registrasi gagal', Colors.red);
@@ -206,7 +207,7 @@ class _RegisterPageState extends State<RegisterPage> {
   setState(() => _sedangMemuat = true);
   try {
     final response = await http.post(
-      Uri.parse('http://10.0.2.2:8000/api/kirim-otp'),
+      Uri.parse('${ApiConfig.baseUrl}/kirim-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': _emailCtrl.text.trim()}),
     );

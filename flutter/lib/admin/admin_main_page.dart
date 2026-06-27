@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'admin_main_page.dart';
 import 'admin_pasien_page.dart';
 import 'admin_artikel_page.dart';
 import 'admin_monitor_page.dart';
-import 'admin_beranda_page.dart';
+import 'admin_dashboard_page.dart';
 
 class AdminMainPage extends StatefulWidget {
   const AdminMainPage({super.key});
@@ -16,7 +15,7 @@ class _AdminMainPageState extends State<AdminMainPage> {
   int _currentIndex = 0;
 
   final List<Widget> _pages = [
-    const AdminBerandaPage(),   // 0 - Dashboard beranda
+    const AdminDashboardPage(),   // 0 - Dashboard beranda
     const AdminPasienPage(),    // 1 - Kelola pasien
     const AdminArtikelPage(),   // 2 - Manajemen artikel
     const AdminMonitorPage(),   // 3 - Monitoring pasien

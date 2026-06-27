@@ -7,6 +7,8 @@ import 'dashboard_page.dart';
 import 'blood_sugar_analysis_page.dart';
 import 'meal_history_page.dart';
 import 'food_photo_input_page.dart';
+import '../services/api_config.dart';
+
 
 class HealthProfilePage extends StatefulWidget {
   const HealthProfilePage({super.key});
@@ -21,7 +23,7 @@ class _HealthProfilePageState extends State<HealthProfilePage> {
 
   int _indeksAktif = 4;
 
-  static const String _baseUrl = 'http://10.0.2.2:8000/api';
+  static const String _baseUrl = ApiConfig.baseUrl;
 
   @override
   void initState() {

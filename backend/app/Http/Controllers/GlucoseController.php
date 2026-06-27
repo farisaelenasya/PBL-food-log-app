@@ -10,8 +10,10 @@ class GlucoseController extends Controller
 {
     public function index()
     {
-        $data = Glucose::latest()->get();
-        
+        $data = Glucose::where('user_id', auth()->id())
+            ->latest()
+            ->get();
+
         $data = $data->map(function ($item) {
             $item->status = $this->statusGlukosa($item->glucose_level);
             $item->kategori = $this->kategoriWHO($item->glucose_level);
@@ -29,23 +31,20 @@ class GlucoseController extends Controller
         Log::info('Data masuk:', $request->all());
 
         $validated = $request->validate([
-            'patient_name' => 'required|string',
             'glucose_level' => 'required|integer|min:1',
         ]);
 
+        $validated['user_id'] = auth()->id();
+        $validated['patient_name'] = auth()->user()->name;
+
         $glucose = Glucose::create($validated);
-        
-        // Tambah status WHO ke response
+
         $glucose->status = $this->statusGlukosa($glucose->glucose_level);
         $glucose->kategori = $this->kategoriWHO($glucose->glucose_level);
 
         return response()->json($glucose, 201);
     }
 
-    /**
-     * Kategori gula darah berdasarkan WHO
-     * Referensi: WHO Global Report on Diabetes 2016
-     */
     private function statusGlukosa(int $level): string
     {
         if ($level < 70) return 'Rendah';

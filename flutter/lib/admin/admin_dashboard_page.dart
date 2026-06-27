@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
-class AdminBerandaPage extends StatefulWidget {
-  const AdminBerandaPage({super.key});
+class AdminDashboardPage extends StatefulWidget {   // ← ubah dari AdminBerandaPage
+  const AdminDashboardPage({super.key});
 
   @override
-  State<AdminBerandaPage> createState() => _AdminBerandaPageState();
+  State<AdminDashboardPage> createState() => _AdminDashboardPageState();
 }
 
-class _AdminBerandaPageState extends State<AdminBerandaPage> {
+class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _isActive = true;
   late final Stream<Map<String, dynamic>> _stream;
 

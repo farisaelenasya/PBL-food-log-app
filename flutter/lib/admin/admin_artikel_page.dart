@@ -48,8 +48,8 @@ Future<void> _loadArtikel() async {
     final data = await ApiService.getArtikel();
    
    for (var e in data) {
-  print("JUDUL: ${e.judul}");
-  print("LINK: ${e.linkArtikel}");
+  debugPrint("JUDUL: ${e.judul}");
+  debugPrint("LINK: ${e.linkArtikel}");
 }
     setState(() {
   _artikel = data.map((e) {
@@ -70,7 +70,7 @@ Future<void> _loadArtikel() async {
   _isLoading = false;
 });
   }catch (e) {
-    print("ERROR ARTIKEL: $e");
+    debugPrint("ERROR ARTIKEL: $e");
 
     setState(() {
       _isLoading = false;

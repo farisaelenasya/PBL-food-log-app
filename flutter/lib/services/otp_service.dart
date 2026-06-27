@@ -1,10 +1,10 @@
 import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'api_config.dart';
 
 class OTPService {
   // Ganti dengan IP Laptop kamu jika pakai Emulator (10.0.2.2) 
   // atau URL domain jika sudah online
-  static const String baseUrl = 'http://10.0.2.2:8000/api';
+  static const String baseUrl = ApiConfig.baseUrl;
 
   // Fungsi Kirim OTP
   static Future<bool> kirimOTP(String email) async {

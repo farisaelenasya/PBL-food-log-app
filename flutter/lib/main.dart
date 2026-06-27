@@ -5,16 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'pages/login_page.dart';
 import 'pages/intro_screen_page.dart';
 import 'services/notification_service.dart';
-import 'database/database_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await dotenv.load(fileName: "assets/env/.env");
-
-  if (!kIsWeb) {
-    await DatabaseHelper.instance.database;
-  }
 
   await NotificationService().init();
 

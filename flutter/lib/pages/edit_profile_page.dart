@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '../services/api_config.dart';
+
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -28,7 +30,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String? _fotoNamaFile;
   final _imagePicker           = ImagePicker();
 
-  static const String _baseUrl = 'http://10.0.2.2:8000/api';
+  static const String _baseUrl = ApiConfig.baseUrl;
 
   final List<String> _daftarDiabetes = [
     'Diabetes Tipe 1',

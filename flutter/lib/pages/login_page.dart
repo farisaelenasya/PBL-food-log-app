@@ -5,6 +5,9 @@ import '../admin/admin_main_page.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api_config.dart';
+
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -47,7 +50,7 @@ class _LoginPageState extends State<LoginPage> {
 
   try {
     final response = await http.post(
-  Uri.parse('http://10.0.2.2:8000/api/login'),
+  Uri.parse('${ApiConfig.baseUrl}/login'),
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
