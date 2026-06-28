@@ -72,20 +72,6 @@ List<String> get _labelHari {
 }).toList();
 }
 
-  List<Map<String, dynamic>> get _riwayat {
-  final now = DateTime.now();
-  return _semuaData.where((r) {
-    final tgl = DateTime.parse(r['created_at']).toLocal();
-    if (_tabAktif == 0) {
-      return tgl.year == now.year && tgl.month == now.month && tgl.day == now.day;
-    } else if (_tabAktif == 1) {
-      return now.difference(tgl).inDays <= 7;
-    } else {
-      return tgl.year == now.year;
-    }
-  }).toList();
-}
-
 List<double> get _dataHarian {
   final now = DateTime.now();
   final entries = _semuaData.where((r) {
@@ -195,8 +181,6 @@ Color get _warnaLatarStatusRataRata {
             _buildKartuGrafik(),
             const SizedBox(height: 16),
             _buildGridStatistik(),
-            const SizedBox(height: 20),
-            _buildRiwayatTerakhir(),
             const SizedBox(height: 100),
           ],
         ),
@@ -417,76 +401,6 @@ Color get _warnaLatarStatusRataRata {
           Text(subjudul, style: TextStyle(fontSize: 11, color: Colors.grey[500])),
         ],
       ),
-    );
-  }
-
-  Widget _buildRiwayatTerakhir() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Riwayat Terakhir', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
-            GestureDetector(
-              onTap: () {},
-              child: const Text('LIHAT SEMUA', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2979FF), letterSpacing: 0.5)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ..._riwayat.map((r) => _buildItemRiwayat(r)),
-      ],
-    );
-  }
-
-  Widget _buildItemRiwayat(Map<String, dynamic> r) {
-    final double nilai = (r['glucose_level'] as num).toDouble();
-    final waktu = DateTime.parse(r['created_at']).toLocal();
-    final Color warnaIkon = nilai < 70
-        ? const Color(0xFFFF6B35)
-        : nilai <= 140
-            ? const Color(0xFF2979FF)
-            : const Color(0xFFFF8C00);
-
-    final now = DateTime.now();
-    final diff = now.difference(waktu);
-    String waktuLabel;
-    if (diff.inHours < 24 && waktu.day == now.day) {
-      waktuLabel = 'Hari ini, ${waktu.hour.toString().padLeft(2,'0')}:${waktu.minute.toString().padLeft(2,'0')}';
-    } else if (diff.inDays == 1) {
-      waktuLabel = 'Kemarin, ${waktu.hour.toString().padLeft(2,'0')}:${waktu.minute.toString().padLeft(2,'0')}';
-    } else {
-      waktuLabel = '${waktu.day}/${waktu.month}/${waktu.year}';
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        leading: Container(
-          width: 44, height: 44,
-          decoration: BoxDecoration(
-            color: warnaIkon.withValues(alpha: 0.12),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(Icons.water_drop, color: warnaIkon, size: 22),
-        ),
-        title: Text(
-          '${nilai.toInt()} mg/dL',
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E)),
-        ),
-        subtitle: Text(
-          '$waktuLabel • ${r['patient_name'] ?? '-'}',
-          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-        ),
-        trailing: Icon(Icons.chevron_right, color: Colors.grey[300]),
-     ),
     );
   }
 

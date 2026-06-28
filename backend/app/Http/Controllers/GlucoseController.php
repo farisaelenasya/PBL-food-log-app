@@ -31,7 +31,9 @@ class GlucoseController extends Controller
         Log::info('Data masuk:', $request->all());
 
         $validated = $request->validate([
-            'glucose_level' => 'required|integer|min:1',
+         'glucose_level' => 'required|integer|min:1',
+         'konteks_makan' => 'nullable|string',
+         'catatan' => 'nullable|string',
         ]);
 
         $validated['user_id'] = auth()->id();

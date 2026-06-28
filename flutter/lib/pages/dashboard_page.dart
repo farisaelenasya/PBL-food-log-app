@@ -654,7 +654,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BloodSugarAnalysisPage())),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GlucoseHistoryPage())),
                   child: const Text('Lihat Detail', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
               ],

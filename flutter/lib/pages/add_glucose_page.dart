@@ -98,8 +98,10 @@ Future<void> _muatNamaUser() async {
   final berhasil = await ApiService.simpanGlukosa(
     patientName: _namaUser,
     glucoseLevel: nilai.toInt(),
+    konteksMakan: _daftarKonteks[_indeksKonteks],
+    catatan: _catatanController.text.trim(),
   );
-
+  
    // Simpan juga ke local store
   final waktuLengkap = DateTime(
     _tanggalDipilih.year, _tanggalDipilih.month, _tanggalDipilih.day,

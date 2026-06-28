@@ -10,6 +10,8 @@ class Glucose extends Model
         'user_id',
         'patient_name',
         'glucose_level',
+        'konteks_makan',
+        'catatan',
     ];
 
     public function user()

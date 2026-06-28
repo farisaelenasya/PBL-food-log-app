@@ -17,25 +17,29 @@ class ApiService {
     };
   }
 
-  /// Kirim data gula darah ke Laravel
-  static Future<bool> simpanGlukosa({
-    required String patientName,
-    required int glucoseLevel,
-  }) async {
-    try {
-      final headers = await _authHeaders();
-      final response = await http.post(
-        Uri.parse('$baseUrl/glucoses'),
-        headers: headers,
-        body: jsonEncode({
-          'glucose_level': glucoseLevel,
-        }),
-      );
-      return response.statusCode == 201;
-    } catch (e) {
-      return false;
-    }
+/// Kirim data gula darah ke Laravel
+static Future<bool> simpanGlukosa({
+  required String patientName,
+  required int glucoseLevel,
+  String? konteksMakan,
+  String? catatan,
+}) async {
+  try {
+    final headers = await _authHeaders();
+    final response = await http.post(
+      Uri.parse('$baseUrl/glucoses'),
+      headers: headers,
+      body: jsonEncode({
+        'glucose_level': glucoseLevel,
+        'konteks_makan': konteksMakan,
+        'catatan': catatan,
+      }),
+    );
+    return response.statusCode == 201;
+  } catch (e) {
+    return false;
   }
+}
 
   /// Ambil 7 data gula darah terbaru
   static Future<List<double>> ambilData7Hari() async {

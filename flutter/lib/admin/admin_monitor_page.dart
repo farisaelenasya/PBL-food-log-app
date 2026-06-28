@@ -50,7 +50,7 @@ class _AdminMonitorPageState extends State<AdminMonitorPage> {
       _errorPasien = null;
     });
 
-    final data = await ApiService.getAdminPatients();
+    final data = await ApiService.getAdminPatients(); 
 
     setState(() {
       _pasienList = data;
