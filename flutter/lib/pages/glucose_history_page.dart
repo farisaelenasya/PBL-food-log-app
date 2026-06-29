@@ -138,15 +138,14 @@ class _GlucoseHistoryPageState extends State<GlucoseHistoryPage> {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: const Color(0xFF2979FF).withValues(alpha: 0.12),
-            shape: BoxShape.circle,
-          ),
-          child:
-              const Icon(Icons.water_drop, color: Color(0xFF2979FF), size: 22),
-        ),
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+               color: warnaStatus(nilai).withValues(alpha: 0.12),
+               shape: BoxShape.circle,
+            ),
+             child: Icon(Icons.water_drop, color: warnaStatus(nilai), size: 22),
+            ),
         title: Text(
           '${nilai.toInt()} mg/dL',
           style: const TextStyle(
@@ -158,7 +157,7 @@ class _GlucoseHistoryPageState extends State<GlucoseHistoryPage> {
           '${_formatWaktuSingkat(waktu)} • ${e['patient_name'] ?? '-'}',
           style: TextStyle(fontSize: 12, color: Colors.grey[500]),
         ),
-        trailing: Icon(Icons.chevron_right, color: Colors.grey[300]),
+        trailing: Icon(Icons.chevron_right, color: warnaStatus(nilai), size: 26),
       ),
     );
   }

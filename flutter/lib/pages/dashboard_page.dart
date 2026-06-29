@@ -97,14 +97,10 @@ class _DashboardPageState extends State<DashboardPage> {
     final terbaru = (semuaData.first['glucose_level'] as num).toDouble();
 
     String status;
-    if (terbaru < 70)
-      status = 'Rendah';
-    else if (terbaru <= 140)
-      status = 'Normal';
-    else if (terbaru <= 180)
-      status = 'Tinggi';
-    else
-      status = 'Sangat Tinggi';
+    if (terbaru < 70) status = 'Rendah';
+    else if (terbaru <= 99) status = 'Normal';
+    else if (terbaru <= 125) status = 'Pra-Diabetes';
+    else status = 'Diabetes';
 
     setState(() {
       _dataGlukosa = grafik;
@@ -159,12 +155,12 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // Ambil kondisi gula darah terbaru
   KondisiGula get _kondisiGula {
-    if (_nilaiTerbaru == 0) return KondisiGula.normal;
-    if (_nilaiTerbaru < 70) return KondisiGula.rendah;
-    if (_nilaiTerbaru <= 140) return KondisiGula.normal;
-    if (_nilaiTerbaru <= 180) return KondisiGula.tinggi;
-    return KondisiGula.sangatTinggi;
-  }
+  if (_nilaiTerbaru == 0) return KondisiGula.normal;
+  if (_nilaiTerbaru < 70) return KondisiGula.rendah;
+  if (_nilaiTerbaru <= 99) return KondisiGula.normal;
+  if (_nilaiTerbaru <= 125) return KondisiGula.tinggi;   // pra-diabetes
+  return KondisiGula.sangatTinggi;                        // diabetes
+}
 
   List<Map<String, dynamic>> get _daftarTips {
     switch (_kondisiGula) {
@@ -587,20 +583,22 @@ class _DashboardPageState extends State<DashboardPage> {
                       color: const Color(0xFFE8F5E9),
                       borderRadius: BorderRadius.circular(20)),
                   child: Row(children: [
-                    Icon(Icons.arrow_forward,
-                        size: 13,
-                        color: _nilaiTerbaru <= 140
-                            ? Colors.green
-                            : Colors.orange),
-                    SizedBox(width: 4),
-                    Text(_statusGula,
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: _nilaiTerbaru <= 140
-                                ? Colors.green
-                                : Colors.orange,
-                            fontWeight: FontWeight.w600)),
-                  ]),
+  Icon(Icons.arrow_forward,
+      size: 13,
+      color: _nilaiTerbaru < 70 ? Colors.orange
+          : _nilaiTerbaru <= 99 ? Colors.green
+          : _nilaiTerbaru <= 125 ? Colors.orange
+          : Colors.red),
+  SizedBox(width: 4),
+  Text(_statusGula,
+      style: TextStyle(
+          fontSize: 12,
+          color: _nilaiTerbaru < 70 ? Colors.orange
+              : _nilaiTerbaru <= 99 ? Colors.green
+              : _nilaiTerbaru <= 125 ? Colors.orange
+              : Colors.red,
+          fontWeight: FontWeight.w600)),
+]),
                 ),
               ],
             ),
@@ -715,7 +713,10 @@ class _DashboardPageState extends State<DashboardPage> {
               final tinggi = (_dataGlukosa[i] / nilaiMaks) * 80;
               final isTerbaru = i == 6;
               final warnaBar = isTerbaru
-                  ? (_nilaiTerbaru <= 140 ? Colors.green : Colors.orange)
+                  ? (_nilaiTerbaru < 70 ? Colors.orange 
+  : _nilaiTerbaru <= 99 ? Colors.green 
+  : _nilaiTerbaru <= 125 ? Colors.orange 
+  : Colors.red)
                   : const Color(0xFF90CAF9);
               return Container(
                 width: 28,
