@@ -30,7 +30,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String? _fotoNamaFile;
   final _imagePicker           = ImagePicker();
 
-  static const String _baseUrl = ApiConfig.baseUrl;
+ static String get baseUrl => ApiConfig.baseUrl;
 
   final List<String> _daftarDiabetes = [
     'Diabetes Tipe 1',
@@ -74,7 +74,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       final token = prefs.getString('token') ?? '';
 
       final res = await http.get(
-        Uri.parse('$_baseUrl/profile'),
+        Uri.parse('${baseUrl}/profile'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -221,7 +221,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (_fotoTerpilih != null || _fotoBytes != null) {
         final request = http.MultipartRequest(
           'POST',
-          Uri.parse('$_baseUrl/profile'),
+          Uri.parse('${baseUrl}/profile'),
         );
         request.headers['Authorization'] = 'Bearer $token';
         request.headers['Accept']        = 'application/json';
@@ -253,7 +253,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       } else {
         res = await http.put(
-          Uri.parse('$_baseUrl/profile'),
+          Uri.parse('${baseUrl}/profile'),
           headers: {
             'Content-Type' : 'application/json',
             'Authorization': 'Bearer $token',

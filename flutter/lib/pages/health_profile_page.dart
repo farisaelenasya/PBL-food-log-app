@@ -24,7 +24,7 @@ class _HealthProfilePageState extends State<HealthProfilePage> {
 
   int _indeksAktif = 4;
 
-  static const String _baseUrl = ApiConfig.baseUrl;
+  static String get baseUrl => ApiConfig.baseUrl;
 
   @override
   void initState() {
@@ -39,7 +39,7 @@ class _HealthProfilePageState extends State<HealthProfilePage> {
       final token = prefs.getString('token') ?? '';
 
       final res = await http.get(
-        Uri.parse('$_baseUrl/profile'),
+        Uri.parse('${baseUrl}/profile'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',

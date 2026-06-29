@@ -17,7 +17,7 @@ class AdminController extends Controller
     }
 
     // GET /api/admin/patients
-    public function patients()
+    public function index()
     {
         $this->cekAdmin();
 

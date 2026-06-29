@@ -3,9 +3,10 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../models/artikel_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'api_config.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.1.3:8000/api';
+  static String get baseUrl => ApiConfig.baseUrl;
   
   static Future<Map<String, String>> _authHeaders() async {
     final prefs = await SharedPreferences.getInstance();
@@ -113,10 +114,14 @@ static Future<bool> simpanGlukosa({
   static Future<List<Map<String, dynamic>>> getAdminPatients() async {
     try {
       final headers = await _authHeaders();
+      debugPrint('URL: $baseUrl/admin/patients'); // TAMBAH
+      debugPrint('Headers: $headers');  
       final response = await http.get(
         Uri.parse('$baseUrl/admin/patients'),
         headers: headers,
       );
+      debugPrint('STATUS: ${response.statusCode}'); // TAMBAH
+      debugPrint('BODY: ${response.body}');  
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
         final List list = json['data'];
