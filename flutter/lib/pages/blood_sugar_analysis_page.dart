@@ -5,6 +5,7 @@ import 'dashboard_page.dart';
 import 'meal_history_page.dart';
 import 'health_profile_page.dart';
 import 'food_photo_input_page.dart';
+import '../utils/glucose_status_helper.dart';
 
 class BloodSugarAnalysisPage extends StatefulWidget {
   const BloodSugarAnalysisPage({super.key});
@@ -17,6 +18,7 @@ class _BloodSugarAnalysisPageState extends State<BloodSugarAnalysisPage> {
   int _tabAktif = 1;
   int _indeksNavbar = 1; 
   final List<String> _daftarTab = ['Hari', 'Minggu', 'Bulan'];
+  final ScrollController _grafikScrollController = ScrollController();
 
   // Data gula darah per hari (SEN-MIN)
   List<Map<String, dynamic>> _semuaData = [];
@@ -82,6 +84,17 @@ List<double> get _dataHarian {
   return entries.map((r) => (r['glucose_level'] as num).toDouble()).toList();
 }
 
+List<String?> get _konteksHarian {
+  final now = DateTime.now();
+  final entries = _semuaData.where((r) {
+    final tgl = DateTime.parse(r['created_at']);
+    final tglLokal = tgl.toLocal();
+    return tglLokal.year == now.year && tglLokal.month == now.month && tglLokal.day == now.day;
+  }).toList();
+  return entries.map((r) => r['konteks_makan']?.toString()).toList();
+}
+
+
 List<double> get _dataAktif {
   if (_tabAktif == 0) return _dataHarian;
   if (_tabAktif == 1) return _dataMingguan;
@@ -110,27 +123,18 @@ double get _variasiGlukosa {
 }
 
 String get _statusRataRata {
-  if (_rataRata == 0) return 'TIDAK ADA DATA';
-  if (_rataRata < 70) return 'RENDAH';
-  if (_rataRata <= 140) return 'NORMAL';
-  if (_rataRata <= 180) return 'TINGGI';
-  return 'SANGAT TINGGI';
+  final status = hitungStatusGula(_rataRata, null); // null = ambang puasa
+  return status.toUpperCase();
 }
 
 Color get _warnaStatusRataRata {
   if (_rataRata == 0) return Colors.grey;
-  if (_rataRata < 70) return Colors.orange;
-  if (_rataRata <= 140) return Colors.green;
-  if (_rataRata <= 180) return const Color(0xFFFF8C00);
-  return Colors.red;
+  return warnaStatusGula(hitungStatusGula(_rataRata, null));
 }
 
 Color get _warnaLatarStatusRataRata {
   if (_rataRata == 0) return Colors.grey.shade100;
-  if (_rataRata < 70) return const Color(0xFFFFF3E0);
-  if (_rataRata <= 140) return const Color(0xFFE8F5E9);
-  if (_rataRata <= 180) return const Color(0xFFFFF8E1);
-  return const Color(0xFFFFEBEE);
+  return warnaStatusGula(hitungStatusGula(_rataRata, null)).withValues(alpha: 0.12);
 }
 
 @override
@@ -168,11 +172,9 @@ Color get _warnaLatarStatusRataRata {
           ),
         ],
       ),
-      body: Stack(
-      children: [
-      SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8),
@@ -181,21 +183,13 @@ Color get _warnaLatarStatusRataRata {
             _buildKartuGrafik(),
             const SizedBox(height: 16),
             _buildGridStatistik(),
-            const SizedBox(height: 100),
+            const SizedBox(height: 20),
           ],
         ),
       ),
-
-    Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: _buildNavBawah(),
-    ),
-  ],
-),
-);
-}
+      bottomNavigationBar: _buildNavBawah(),
+    );
+  }
 
   Widget _buildTabPeriode() {
     return Container(
@@ -294,35 +288,216 @@ Color get _warnaLatarStatusRataRata {
             ],
           ),
           const SizedBox(height: 16),
-          SizedBox(
+          _isLoading
+    ? const SizedBox(
+        height: 180,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      )
+    : _dataValid.isEmpty
+        ? const SizedBox(
             height: 180,
-            child: _isLoading
-             ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-             : _dataValid.isEmpty
-              ? const Center(child: Text('Belum ada data', style: TextStyle(color: Colors.grey)))
-             : _GrafikGaris(
-            data: _dataAktif.map((v) => v < 0 ? 0.0 : v).toList(),
-            labelHari: _labelHari,
-            indeksAktif: (_dataAktif.length - 1).clamp(0, _dataAktif.length - 1),
-          ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: _labelHari.asMap().entries.map((e) {
-            final aktif = e.key == _dataAktif.lastIndexWhere((v) => v > 0);
-            return Expanded(
-              child: Text(
-                  e.value,
-                 textAlign: TextAlign.center,
-                 style: TextStyle(
-            fontSize: _tabAktif == 2 ? 9 : 11,
-            fontWeight: aktif ? FontWeight.bold : FontWeight.normal,
-            color: aktif ? const Color(0xFF2979FF) : Colors.grey[400],
-        ),
+            child: Center(
+                child: Text('Belum ada data',
+                    style: TextStyle(color: Colors.grey))),
+          )
+        : _buildGrafikBatang(),
+        ],
       ),
     );
-  }).toList(),
+  }
+
+Widget _buildGrafikBatang() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_grafikScrollController.hasClients) {
+        _grafikScrollController.jumpTo(
+          _grafikScrollController.position.maxScrollExtent,
+        );
+      }
+    });
+
+    const double tinggiChart = 140;
+    const double lebarBar = 28;
+    const double jarakBar = 14;
+
+    final data = _dataAktif.map((v) => v < 0 ? 0.0 : v).toList();
+    final labels = _labelHari;
+    final indeksAktif = (_dataAktif.length - 1).clamp(0, _dataAktif.length - 1);
+
+    final double nilaiMaksData =
+        data.isEmpty ? 0 : data.reduce((a, b) => a > b ? a : b);
+    final double skalaMaks = nilaiMaksData < 180 ? 200 : nilaiMaksData + 20;
+
+    return SizedBox(
+      height: tinggiChart + 34,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ===== SUMBU Y (statis, tidak ikut ke-scroll) =====
+          SizedBox(
+            width: 34,
+            height: tinggiChart,
+            child: Builder(
+              builder: (context) {
+                final posisi180 = tinggiChart * (1 - (180 / skalaMaks));
+                final posisi70 = tinggiChart * (1 - (70 / skalaMaks));
+                const posisiMaks = 0.0;
+                final tampilkanLabelMaks =
+                    (posisi180 - posisiMaks).abs() > 14;
+
+                return Stack(
+                  children: [
+                    if (tampilkanLabelMaks)
+                      Positioned(
+                        top: 0,
+                        right: 2,
+                        child: Text(skalaMaks.toStringAsFixed(0),
+                            style: TextStyle(
+                                fontSize: 9, color: Colors.grey[400])),
+                      ),
+                    Positioned(
+                      top: posisi180 - 6,
+                      right: 2,
+                      child: Text('180',
+                          style:
+                              TextStyle(fontSize: 9, color: Colors.red[300])),
+                    ),
+                    Positioned(
+                      top: posisi70 - 6,
+                      right: 2,
+                      child: Text('70',
+                          style: TextStyle(
+                              fontSize: 9, color: Colors.orange[400])),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 2,
+                      child: Text('0',
+                          style: TextStyle(
+                              fontSize: 9, color: Colors.grey[400])),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(width: 6),
+          // ===== AREA GRAFIK BATANG (bisa discroll ke samping) =====
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final double lebarData = (lebarBar + jarakBar) * data.length;
+                final double lebarChart = lebarData > constraints.maxWidth
+                    ? lebarData
+                    : constraints.maxWidth;
+                return SingleChildScrollView(
+              controller: _grafikScrollController,
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: lebarChart,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // garis bantu 180
+                    Positioned(
+                      top: tinggiChart * (1 - (180 / skalaMaks)),
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                          height: 1, color: Colors.red.withValues(alpha: 0.25)),
+                    ),
+                    // garis bantu 70
+                    Positioned(
+                      top: tinggiChart * (1 - (70 / skalaMaks)),
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                          height: 1,
+                          color: Colors.orange.withValues(alpha: 0.3)),
+                    ),
+                    // garis dasar / sumbu X
+                    Positioned(
+                      top: tinggiChart,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                          height: 1,
+                          color: Colors.grey.withValues(alpha: 0.3)),
+                    ),
+                    // batang + label
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: List.generate(data.length, (i) {
+                        final nilai = data[i];
+                        final tinggiBar =
+                            nilai <= 0 ? 0.0 : (nilai / skalaMaks) * tinggiChart;
+                        final isAktif = i == indeksAktif && nilai > 0;
+                        final konteks = _tabAktif == 0 && i < _konteksHarian.length
+                            ? _konteksHarian[i]
+                            : null;
+                        final warnaBar = nilai <= 0
+                            ? const Color(0xFFE0E0E0)
+                            : warnaStatusGula(hitungStatusGula(nilai, konteks));
+
+                        return Padding(
+                          padding: EdgeInsets.only(right: jarakBar),
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                width: lebarBar,
+                                height: tinggiChart,
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  alignment: Alignment.bottomCenter,
+                                  children: [
+                                    if (nilai > 0)
+                                      Positioned(
+                                        bottom:
+                                            tinggiBar.clamp(3.0, tinggiChart) +
+                                                3,
+                                        child: Text(
+                                          nilai.toStringAsFixed(0),
+                                          style: TextStyle(
+                                              fontSize: 8,
+                                              color: Colors.grey[500]),
+                                        ),
+                                      ),
+                                    Container(
+                                      width: lebarBar,
+                                      height: nilai <= 0
+                                          ? 4.0
+                                          : tinggiBar.clamp(3.0, tinggiChart),
+                                      decoration: BoxDecoration(
+                                        color: warnaBar,
+                                        borderRadius:
+                                            BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                i < labels.length ? labels[i] : '',
+                                style: TextStyle(
+                                    fontSize: _tabAktif == 2 ? 8 : 9,
+                                    color: isAktif
+                                        ? const Color(0xFF2979FF)
+                                        : Colors.grey[400],
+                                    fontWeight: isAktif
+                                        ? FontWeight.w700
+                                        : FontWeight.normal),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ),
+                ],
+                ),
+              ),
+            );
+              },
+            ),
           ),
         ],
       ),

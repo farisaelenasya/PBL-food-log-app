@@ -160,21 +160,26 @@ class _CatatanMakananManualPageState
   }
 
   // HITUNG NUTRISI
-  final kalori =
-      (_selectedFood!['kalori_100g'] as num) *
-      _totalGram / 100;
+  final kalori100g =
+    double.tryParse(_selectedFood!['kalori_100g'].toString()) ?? 0;
 
-  final karbo =
-      (_selectedFood!['karbo_100g'] as num) *
-      _totalGram / 100;
+final karbo100g =
+    double.tryParse(_selectedFood!['karbo_100g'].toString()) ?? 0;
 
-  final protein =
-      (_selectedFood!['protein_100g'] as num) *
-      _totalGram / 100;
+final protein100g =
+    double.tryParse(_selectedFood!['protein_100g'].toString()) ?? 0;
 
-  final lemak =
-      (_selectedFood!['lemak_100g'] as num) *
-      _totalGram / 100;
+final lemak100g =
+    double.tryParse(_selectedFood!['lemak_100g'].toString()) ?? 0;
+
+final serat100g =
+    double.tryParse(_selectedFood!['serat_100g'].toString()) ?? 0;
+
+final gula100g =
+    double.tryParse(_selectedFood!['gula_100g'].toString()) ?? 0;
+
+final indeksGlikemik =
+    int.tryParse(_selectedFood!['indeks_glikemik'].toString()) ?? 50;
 
   // BUAT OBJECT JURNAL
   final jurnal = JurnalMakanan(
@@ -487,10 +492,22 @@ if (berhasil) {
     final totalGram = gramPerS * _jumlahPorsi;
 
     // Hitung nutrisi preview
-    final kalori  = (_selectedFood!['kalori_100g']  as num) * totalGram / 100;
-    final karbo   = (_selectedFood!['karbo_100g']   as num) * totalGram / 100;
-    final protein = (_selectedFood!['protein_100g'] as num) * totalGram / 100;
-    final lemak   = (_selectedFood!['lemak_100g']   as num) * totalGram / 100;
+   final kalori100g =
+    double.tryParse(_selectedFood!['kalori_100g'].toString()) ?? 0;
+
+final karbo100g =
+    double.tryParse(_selectedFood!['karbo_100g'].toString()) ?? 0;
+
+final protein100g =
+    double.tryParse(_selectedFood!['protein_100g'].toString()) ?? 0;
+
+final lemak100g =
+    double.tryParse(_selectedFood!['lemak_100g'].toString()) ?? 0;
+
+final kalori = kalori100g * totalGram / 100;
+final karbo = karbo100g * totalGram / 100;
+final protein = protein100g * totalGram / 100;
+final lemak = lemak100g * totalGram / 100;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

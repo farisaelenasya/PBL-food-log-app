@@ -155,34 +155,35 @@ static Future<bool> simpanGlukosa({
   }
 
   // FOOD
-  static Future<List<Map<String, dynamic>>> searchFoods(String query) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/foods/search?q=$query'),
-      );
+ static Future<List<Map<String, dynamic>>> searchFoods(String query) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/foods/search?q=$query'),
+    );
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        return data.map((e) => Map<String, dynamic>.from(e)).toList();
-      }
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
 
-      return [];
-    } catch (e) {
-      debugPrint('Search Food Error: $e');
-      return [];
+      // Normalisasi semua angka dari String menjadi double/int
+      return normalizeFoodData(data);
     }
+
+    return [];
+  } catch (e) {
+    debugPrint('Search Food Error: $e');
+    return [];
   }
+}
 
   static Future<bool> saveFoodLog(Map<String, dynamic> jurnal) async {
     try {
       debugPrint('=== DATA DIKIRIM ===');
       debugPrint(jsonEncode(jurnal));
 
+      final headers = await _authHeaders();
       final response = await http.post(
         Uri.parse('$baseUrl/food-logs'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: jsonEncode(jurnal),
       );
 
@@ -237,8 +238,10 @@ static Future<bool> simpanGlukosa({
 
   static Future<List<Map<String, dynamic>>> getFoodLogs() async {
     try {
+      final headers = await _authHeaders();
       final response = await http.get(
         Uri.parse('$baseUrl/food-logs'),
+        headers: headers,
       );
 
       debugPrint(response.body);
@@ -286,8 +289,10 @@ static Future<bool> simpanGlukosa({
 
   static Future<Map<String, dynamic>> getDailySugar() async {
     try {
+      final headers = await _authHeaders();
       final response = await http.get(
         Uri.parse('$baseUrl/daily-sugar'),
+        headers: headers,
       );
 
       debugPrint('=== DAILY SUGAR ===');

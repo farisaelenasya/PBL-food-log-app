@@ -196,10 +196,13 @@ class _DetailPengukuranPageState extends State<DetailPengukuranPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final data = widget.data;
-    final double nilai = (data['glucose_level'] as num).toDouble();
-    final waktu = DateTime.parse(data['created_at']);
+Widget build(BuildContext context) {
+  final data = widget.data;
+
+  debugPrint('Data Detail: $data');
+
+  final double nilai = (data['glucose_level'] as num).toDouble();
+  final waktu = DateTime.parse(data['created_at']).toLocal();
     final warna = _warnaStatus(nilai);
     final status = _statusGlukosa(nilai);
     final konteksMakan = data['konteks_makan'];

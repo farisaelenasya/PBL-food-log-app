@@ -121,8 +121,7 @@ class _GlucoseHistoryPageState extends State<GlucoseHistoryPage> {
 
   Widget _buildKontenEntri(Map<String, dynamic> e) {
     final double nilai = (e['glucose_level'] as int).toDouble();
-    final waktu = DateTime.parse(e['created_at']);
-
+    final waktu = DateTime.parse(e['created_at']).toLocal();
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(

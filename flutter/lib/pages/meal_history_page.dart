@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import 'package:intl/date_symbol_data_local.dart';
-
+import 'dashboard_page.dart';
+import 'blood_sugar_analysis_page.dart';
+import 'health_profile_page.dart';
+import 'food_photo_input_page.dart';
 class MealHistoryPage extends StatefulWidget {
   const MealHistoryPage({super.key});
 
@@ -14,6 +17,7 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
   List<Map<String, dynamic>> _riwayat = [];
   bool _isLoading = true;
   int _selectedTab = 0;
+  int _indeksNavbar = 3;
   double _totalKalori = 0;
   double _totalKarbo = 0;
   double _totalGula = 0;
@@ -435,6 +439,7 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
                     ),
                   ],
                 ),
+                bottomNavigationBar: _buildNavBawah(), 
     );
   }
 
@@ -499,6 +504,95 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
       ),
     );
   }
+
+   Widget _buildNavBawah() {
+    final daftarMenu = [
+      {'ikon': Icons.home_rounded, 'label': 'Beranda'},
+      {'ikon': Icons.bar_chart_rounded, 'label': 'Laporan'},
+      {'ikon': null, 'label': 'Tambah'},
+      {'ikon': Icons.history_rounded, 'label': 'Riwayat'},
+      {'ikon': Icons.person_outline_rounded, 'label': 'Profil'},
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.07),
+              blurRadius: 20,
+              offset: const Offset(0, -4))
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: List.generate(daftarMenu.length, (i) {
+          if (i == 2) {
+            return GestureDetector(
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const FoodPhotoInputPage())),
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF2979FF),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                        color: Color(0x442979FF),
+                        blurRadius: 12,
+                        offset: Offset(0, 4))
+                  ],
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 28),
+              ),
+            );
+          }
+
+          final aktif = _indeksNavbar == i;
+
+          final List<Widget?> halamanTujuan = [
+            const DashboardPage(),
+            const BloodSugarAnalysisPage(),
+            null,
+            const MealHistoryPage(),
+            const HealthProfilePage()
+          ];
+
+          return GestureDetector(
+            onTap: () {
+              setState(() => _indeksNavbar = i);
+
+              if (halamanTujuan[i] != null) {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => halamanTujuan[i]!));
+              }
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(daftarMenu[i]['ikon'] as IconData,
+                    color: aktif ? const Color(0xFF2979FF) : Colors.grey[400],
+                    size: 24),
+                const SizedBox(height: 3),
+                Text(daftarMenu[i]['label'] as String,
+                    style: TextStyle(
+                        fontSize: 10,
+                        color:
+                            aktif ? const Color(0xFF2979FF) : Colors.grey[400],
+                        fontWeight:
+                            aktif ? FontWeight.w600 : FontWeight.normal)),
+              ],
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
 
   Widget _buildRingkasan(String nilai, String label) {
     return Column(

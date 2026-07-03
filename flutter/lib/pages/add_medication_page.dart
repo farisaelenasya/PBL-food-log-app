@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/medication_service.dart';
+import '../services/notification_service.dart';
 import 'notifikasi_page.dart';
 
 class AddMedicationPage extends StatefulWidget {
@@ -37,6 +38,16 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     'Setelah Makan Malam',
     'Sebelum Tidur',
   ];
+  
+  final Map<String, String> _defaultJamMakan = {
+  'Sebelum Sarapan': '06:00',
+  'Setelah Sarapan': '07:00',
+  'Sebelum Makan Siang': '11:30',
+  'Setelah Makan Siang': '12:30',
+  'Sebelum Makan Malam': '17:30',
+  'Setelah Makan Malam': '18:30',
+  'Sebelum Tidur': '21:00',
+};
 
   @override
   void dispose() {
@@ -46,35 +57,63 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     super.dispose();
   }
 
-  void _tambahWaktu() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Pilih Waktu',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ..._pilihanWaktuMakan.map((w) => ListTile(
-                  title: Text(w),
-                  onTap: () {
-                    setState(() => _chipWaktu.add(w));
-                    Navigator.pop(ctx);
-                  },
-                )),
-          ],
+void _tambahWaktu() async {
+    if (_indeksWaktu == 0) {
+      // Mode "Jam Spesifik" → tampilkan time picker
+      final waktu = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.now(),
+        builder: (ctx, child) => MediaQuery(
+          data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
         ),
-      ),
-    );
+      );
+      if (waktu != null) {
+        final jam = waktu.hour.toString().padLeft(2, '0');
+        final menit = waktu.minute.toString().padLeft(2, '0');
+        setState(() => _chipWaktu.add('$jam:$menit'));
+      }
+    } else {
+      // Mode "Waktu Makan" → tampilkan daftar label
+      showModalBottomSheet(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Pilih Waktu',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              ..._pilihanWaktuMakan.map((w) => ListTile(
+                    title: Text(w),
+                    onTap: () {
+                      setState(() => _chipWaktu.add(w));
+                      Navigator.pop(ctx);
+                    },
+                  )),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   void _hapusChip(int i) => setState(() => _chipWaktu.removeAt(i));
+
+  ({int hour, int minute}) _parseJamDariChip(String chip) {
+  if (chip.contains(':')) {
+    final parts = chip.split(':');
+    return (hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+  }
+  final default_ = _defaultJamMakan[chip] ?? '08:00';
+  final parts = default_.split(':');
+  return (hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+}
 
   // ── SIMPAN via API ──────────────────────────────────────────
   void _simpan() async {
@@ -100,6 +139,44 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         tipe: _indeksWaktu == 0 ? 'jam' : 'makan',
         catatan: _catatanController.text.trim(),
       );
+
+      final frekuensiLabel = _daftarFrekuensi[_indeksFrekuensi]['label'] as String;
+      if (frekuensiLabel != 'Sesuai Kebutuhan') {
+        final namaObat = _namaController.text.trim();
+        final dosis = _dosisController.text.trim().isEmpty
+            ? '-'
+            : _dosisController.text.trim();
+
+        for (int i = 0; i < _chipWaktu.length; i++) {
+          final chip = _chipWaktu[i];
+          final jamMenit = _parseJamDariChip(chip);  
+          int jam = jamMenit.hour;
+          int menit = jamMenit.minute;
+
+          if (chip.contains(':')) {
+            final parts = chip.split(':');
+            jam = int.parse(parts[0]);
+            menit = int.parse(parts[1]);
+          } else {
+            final default_ = _defaultJamMakan[chip] ?? '08:00';
+            final parts = default_.split(':');
+            jam = int.parse(parts[0]);
+            menit = int.parse(parts[1]);
+          }
+
+          final notifId = ('$namaObat-$chip').hashCode & 0x7FFFFFFF;
+
+          await NotificationService().jadwalkanNotifObat(
+            id: notifId,
+            namaObat: namaObat,
+            dosis: dosis,
+            waktuLabel: chip,
+            jam: jam,
+            menit: menit,
+          );
+        }
+      }
+      
 
       if (!mounted) return;
       _showSnackbar('Obat berhasil disimpan!', const Color(0xFF2979FF));

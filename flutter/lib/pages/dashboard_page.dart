@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../models/artikel_model.dart';
 import '../services/api_service.dart';
+import '../utils/glucose_status_helper.dart';
 import 'health_profile_page.dart';
 import 'rewards_page.dart';
 import 'edit_profile_page.dart';
@@ -36,13 +36,15 @@ class _DashboardPageState extends State<DashboardPage> {
   String _namaUser = '';
   String _hariTanggal = '';
   String? _fotoProfilUrl;
-  List<ArtikelModel> artikelList = [];
+  List<ArtikelModel> _artikelList = [];
   bool isLoadingArtikel = true;
 
   final PageController _tipsController = PageController();
+  final ScrollController _grafikScrollController = ScrollController();
   List<double> _dataGlukosa = [0, 0, 0, 0, 0, 0, 0];
   double _rataRata7Hari = 0;
   double _nilaiTerbaru = 0;
+  String? _konteksTerbaru;
   String _statusGula = 'Normal';
 
   @override
@@ -57,7 +59,7 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final data = await ApiService.getArtikel();
       setState(() {
-        artikelList = data;
+        _artikelList = data;
         isLoadingArtikel = false;
       });
     } catch (e) {
@@ -81,8 +83,18 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _muatDataGlukosa() async {
     final semuaData = await ApiService.ambilSemuaData();
-    if (semuaData.isEmpty) return;
+    if (semuaData.isEmpty) {
+      setState(() {
+        _statusGula = "Belum Ada Data";
+      });
+      return;
+    }
 
+    // Urutkan berdasarkan tanggal terbaru
+semuaData.sort((a, b) =>
+    DateTime.parse(b['created_at'])
+        .compareTo(DateTime.parse(a['created_at'])));
+   
     // Ambil 7 data terbaru
     final data7 = semuaData.take(7).toList();
     final nilaiList =
@@ -95,17 +107,16 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     final rata = nilaiList.reduce((a, b) => a + b) / nilaiList.length;
     final terbaru = (semuaData.first['glucose_level'] as num).toDouble();
+    final konteksTerbaru = semuaData.first['konteks_makan']?.toString();
 
-    String status;
-    if (terbaru < 70) status = 'Rendah';
-    else if (terbaru <= 99) status = 'Normal';
-    else if (terbaru <= 125) status = 'Pra-Diabetes';
-    else status = 'Diabetes';
+    final status = hitungStatusGula(terbaru, konteksTerbaru);
+
 
     setState(() {
       _dataGlukosa = grafik;
       _rataRata7Hari = rata;
       _nilaiTerbaru = terbaru;
+      _konteksTerbaru = konteksTerbaru;
       _statusGula = status;
     });
   }
@@ -153,14 +164,29 @@ class _DashboardPageState extends State<DashboardPage> {
     return '$sapaan, $_namaUser';
   }
 
-  // Ambil kondisi gula darah terbaru
+ // Ambil kondisi gula darah terbaru
   KondisiGula get _kondisiGula {
-  if (_nilaiTerbaru == 0) return KondisiGula.normal;
-  if (_nilaiTerbaru < 70) return KondisiGula.rendah;
-  if (_nilaiTerbaru <= 99) return KondisiGula.normal;
-  if (_nilaiTerbaru <= 125) return KondisiGula.tinggi;   // pra-diabetes
-  return KondisiGula.sangatTinggi;                        // diabetes
-}
+    if (_nilaiTerbaru == 0) return KondisiGula.normal;
+    if (_nilaiTerbaru < 70) return KondisiGula.rendah;
+
+    if (isKonteksSebelumTidur(_konteksTerbaru)) {
+      if (_nilaiTerbaru <= 140) return KondisiGula.normal;
+      if (_nilaiTerbaru <= 180) return KondisiGula.tinggi;       // perlu perhatian
+      return KondisiGula.sangatTinggi;                            // tinggi
+    }
+
+    final setelahMakan = isKonteksSetelahMakan(_konteksTerbaru);
+
+    if (setelahMakan) {
+      if (_nilaiTerbaru < 140) return KondisiGula.normal;
+      if (_nilaiTerbaru <= 199) return KondisiGula.tinggi;      // prediabetes
+      return KondisiGula.sangatTinggi;                           // diabetes
+    } else {
+      if (_nilaiTerbaru < 100) return KondisiGula.normal;
+      if (_nilaiTerbaru <= 125) return KondisiGula.tinggi;      // prediabetes
+      return KondisiGula.sangatTinggi;                           // diabetes
+    }
+  }
 
   List<Map<String, dynamic>> get _daftarTips {
     switch (_kondisiGula) {
@@ -450,35 +476,26 @@ class _DashboardPageState extends State<DashboardPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: SafeArea(
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 100),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(),
-                  const SizedBox(height: 16),
-                  _buildKartuGlukosa(),
-                  const SizedBox(height: 20),
-                  _buildAksiCepat(),
-                  const SizedBox(height: 20),
-                  _buildTipsHarian(),
-                  const SizedBox(height: 20),
-                  _buildEdukasi(),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: _buildNavBawah(),
-            ),
-          ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 16),
+              _buildKartuGlukosa(),
+              const SizedBox(height: 20),
+              _buildAksiCepat(),
+              const SizedBox(height: 20),
+              _buildTipsHarian(),
+              const SizedBox(height: 20),
+              _buildEdukasi(),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
+      bottomNavigationBar: _buildNavBawah(),
     );
   }
 
@@ -576,32 +593,25 @@ class _DashboardPageState extends State<DashboardPage> {
                         fontSize: 13,
                         color: Colors.grey[500],
                         fontWeight: FontWeight.w500)),
-                Container(
+               Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
+                      color: warnaStatusGula(_statusGula).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20)),
                   child: Row(children: [
-  Icon(Icons.arrow_forward,
-      size: 13,
-      color: _nilaiTerbaru < 70 ? Colors.orange
-          : _nilaiTerbaru <= 99 ? Colors.green
-          : _nilaiTerbaru <= 125 ? Colors.orange
-          : Colors.red),
-  SizedBox(width: 4),
-  Text(_statusGula,
-      style: TextStyle(
-          fontSize: 12,
-          color: _nilaiTerbaru < 70 ? Colors.orange
-              : _nilaiTerbaru <= 99 ? Colors.green
-              : _nilaiTerbaru <= 125 ? Colors.orange
-              : Colors.red,
-          fontWeight: FontWeight.w600)),
-]),
+                    Icon(Icons.arrow_forward,
+                        size: 13,
+                        color: warnaStatusGula(_statusGula)),
+                    const SizedBox(width: 4),
+                    Text(_statusGula,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: warnaStatusGula(_statusGula),
+                            fontWeight: FontWeight.w600)),
+                  ]),
                 ),
-              ],
-            ),
+]),
             const SizedBox(height: 8),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -664,69 +674,186 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildGrafikBatang() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_grafikScrollController.hasClients) {
+        _grafikScrollController.jumpTo(
+          _grafikScrollController.position.maxScrollExtent,
+        );
+      }
+    });
+
+    const double tinggiChart = 90;
+    const double lebarBar = 28;
+    const double jarakBar = 14;
+
     final double nilaiMaks = _dataGlukosa.reduce((a, b) => a > b ? a : b);
-    if (nilaiMaks == 0) {
-      return SizedBox(
-        height: 80,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(7, (i) => Container(
-            width: 28, height: 4,
-            decoration: BoxDecoration(
-              color: const Color(0xFFBBDEFB),
-              borderRadius: BorderRadius.circular(6),
-            ),
-          )),
-        ),
-      );
-    }
+    final double skalaMaks = nilaiMaks < 140 ? 160 : nilaiMaks + 20;
+
+    final now = DateTime.now();
+    const daftarHariSingkat = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    final labelHari = List.generate(7, (i) {
+      final tanggal = now.subtract(Duration(days: 6 - i));
+      return daftarHariSingkat[tanggal.weekday % 7];
+    });
 
     return SizedBox(
-      height: 80,
-      child: Stack(
+      height: tinggiChart + 34, // tinggi bar + ruang label nilai atas + label hari bawah
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            top: 80 * (1 - (140 / nilaiMaks)).clamp(0.0, 1.0),
-            left: 0, right: 0,
-            child: Row(children: [
-              Text('140', style: TextStyle(fontSize: 8, color: Colors.green[300])),
-              const SizedBox(width: 4),
-              Expanded(child: Container(height: 1,
-                color: Colors.green.withValues(alpha: 0.3))),
-            ]),
+          // ===== SUMBU Y (statis, tidak ikut ke-scroll) =====
+          SizedBox(
+            width: 36,
+            height: tinggiChart,
+            child: Builder(
+              builder: (context) {
+                final posisi140 = tinggiChart * (1 - (140 / skalaMaks));
+                const posisiMaks = 0.0;
+                // hanya tampilkan label skalaMaks kalau jaraknya cukup jauh dari label 140
+                final tampilkanLabelMaks = (posisi140 - posisiMaks).abs() > 14;
+
+                return Stack(
+                  children: [
+                    if (tampilkanLabelMaks)
+                      Positioned(
+                        top: 0,
+                        right: 6,
+                        child: Text(skalaMaks.toStringAsFixed(0),
+                            style: TextStyle(
+                                fontSize: 10, color: Colors.grey[400])),
+                      ),
+                    Positioned(
+                      top: posisi140 - 6,
+                      right: 6,
+                      child: Text('140',
+                          style: TextStyle(
+                              fontSize: 10, color: Colors.green[400])),
+                    ),
+                    Positioned(
+                      top: (tinggiChart * (1 - (70 / skalaMaks))) - 6,
+                      right: 6,
+                      child: Text('70',
+                          style: TextStyle(
+                              fontSize: 10, color: Colors.orange[400])),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 6,
+                      child: Text('0',
+                          style: TextStyle(
+                              fontSize: 10, color: Colors.grey[400])),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
-          Positioned(
-            top: 80 * (1 - (70 / nilaiMaks)).clamp(0.0, 1.0),
-            left: 0, right: 0,
-            child: Row(children: [
-              Text('70', style: TextStyle(fontSize: 8, color: Colors.orange[300])),
-              const SizedBox(width: 4),
-              Expanded(child: Container(height: 1,
-                color: Colors.orange.withValues(alpha: 0.3))),
-            ]),
-          ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(7, (i) {
-              final tinggi = (_dataGlukosa[i] / nilaiMaks) * 80;
-              final isTerbaru = i == 6;
-              final warnaBar = isTerbaru
-                  ? (_nilaiTerbaru < 70 ? Colors.orange 
-  : _nilaiTerbaru <= 99 ? Colors.green 
-  : _nilaiTerbaru <= 125 ? Colors.orange 
-  : Colors.red)
-                  : const Color(0xFF90CAF9);
-              return Container(
-                width: 28,
-                height: tinggi,
-                decoration: BoxDecoration(
-                  color: warnaBar,
-                  borderRadius: BorderRadius.circular(6),
+          const SizedBox(width: 6),
+          // ===== AREA GRAFIK BATANG (bisa discroll ke samping) =====
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _grafikScrollController,
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: (lebarBar + jarakBar) * 7,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // garis bantu 140
+                    Positioned(
+                      top: tinggiChart * (1 - (140 / skalaMaks)),
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                          height: 1,
+                          color: Colors.green.withValues(alpha: 0.3)),
+                    ),
+                    // garis bantu 70
+                    Positioned(
+                      top: tinggiChart * (1 - (70 / skalaMaks)),
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                          height: 1,
+                          color: Colors.orange.withValues(alpha: 0.3)),
+                    ),
+                    // garis dasar / sumbu X
+                    Positioned(
+                      top: tinggiChart,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                          height: 1, color: Colors.grey.withValues(alpha: 0.3)),
+                    ),
+                    // batang + label hari
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: List.generate(7, (i) {
+                        final nilai = _dataGlukosa[i];
+                        final tinggiBar =
+                            nilai == 0 ? 0.0 : (nilai / skalaMaks) * tinggiChart;
+                        final isTerbaru = i == 6;
+                        final warnaBar = isTerbaru
+                        ? warnaStatusGula(_statusGula)
+                          : const Color(0xFF90CAF9);
+                        return Padding(
+                          padding: EdgeInsets.only(right: jarakBar),
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                width: lebarBar,
+                                height: tinggiChart,
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  alignment: Alignment.bottomCenter,
+                                  children: [
+                                    if (nilai > 0)
+                                      Positioned(
+                                        bottom:
+                                            tinggiBar.clamp(3.0, tinggiChart) + 3,
+                                        child: Text(
+                                          nilai.toStringAsFixed(0),
+                                          style: TextStyle(
+                                              fontSize: 9,
+                                              color: Colors.grey[800]),
+                                        ),
+                                      ),
+                                    Container(
+                                      width: lebarBar,
+                                      height: nilai == 0
+                                          ? 4.0
+                                          : tinggiBar.clamp(3.0, tinggiChart),
+                                      decoration: BoxDecoration(
+                                        color: nilai == 0
+                                            ? const Color(0xFFBBDEFB)
+                                            : warnaBar,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                labelHari[i],
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    color: isTerbaru
+                                        ? const Color(0xFF2979FF)
+                                        : Colors.grey[600],
+                                    fontWeight: isTerbaru
+                                        ? FontWeight.w700
+                                        : FontWeight.normal),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
                 ),
-              );
-            }),
+              ),
+            ),
           ),
         ],
       ),
@@ -813,10 +940,18 @@ class _DashboardPageState extends State<DashboardPage> {
         subtitle: Text(aksi['subjudul'] as String,
             style: TextStyle(fontSize: 12, color: Colors.grey[500])),
         trailing: Icon(Icons.chevron_right, color: Colors.grey[400]),
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => aksi['halaman'] as Widget)),
+        onTap: () async {
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => aksi['halaman'] as Widget,
+    ),
+  );
+
+  _muatDataGlukosa();
+},
       ),
-    );
+    );  
   }
 
   Widget _buildTipsHarian() {
@@ -971,25 +1106,36 @@ class _DashboardPageState extends State<DashboardPage> {
                           ? Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(children: [
-                                  Container(
-                                    width: 34,
-                                    height: 34,
-                                    decoration: BoxDecoration(
-                                        color:
-                                            Colors.white.withValues(alpha: 0.2),
-                                        borderRadius:
-                                            BorderRadius.circular(10)),
-                                    child: const Icon(Icons.no_food_outlined,
-                                        color: Colors.white, size: 18),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  const Text('Makanan yang Perlu Dihindari',
-                                      style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13)),
-                                ]),
+                               Row(
+                               children: [
+                               Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(10),
+                            ),
+                                child: Icon(
+                                tip['mode'] == 'anjuran'
+                                ? Icons.check_circle_outline
+                                : Icons.no_food_outlined,
+                             color: Colors.white,
+                             size: 18,
+                           ),
+                        ),
+                      const SizedBox(width: 10),
+                    Text(
+                      tip['mode'] == 'anjuran'
+                     ? 'Makanan yang Dianjurkan'
+                     : 'Makanan yang Dihindari',
+                     style: const TextStyle(
+                     color: Colors.white,
+                     fontWeight: FontWeight.bold,
+                     fontSize: 13,
+                  ),
+               ),
+            ],
+          ),
                                 const SizedBox(height: 10),
                                 Expanded(
                                   child: ListView.builder(
@@ -1014,7 +1160,10 @@ class _DashboardPageState extends State<DashboardPage> {
                                                   color: Colors.white
                                                       .withValues(alpha: 0.25),
                                                   shape: BoxShape.circle),
-                                              child: const Icon(Icons.close,
+                                              child: Icon(
+                                                  tip['mode'] == 'anjuran'
+                                                      ? Icons.check
+                                                      : Icons.close,
                                                   color: Colors.white,
                                                   size: 11),
                                             ),
@@ -1168,7 +1317,7 @@ class _DashboardPageState extends State<DashboardPage> {
               offset: const Offset(0, -4))
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(0, 10, 0, 24),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: List.generate(daftarMenu.length, (i) {

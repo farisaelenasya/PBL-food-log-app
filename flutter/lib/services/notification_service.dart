@@ -1,4 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tzdata;
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -13,6 +15,9 @@ class NotificationService {
   // ── Init ─────────────────────────────────────────────────────────────────
   Future<void> init() async {
     if (_initialized) return;
+
+     tzdata.initializeTimeZones();                    
+  tz.setLocalLocation(tz.getLocation('Asia/Jakarta')); 
 
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -33,6 +38,7 @@ class NotificationService {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
     await androidImpl?.requestNotificationsPermission();
+    await androidImpl?.requestExactAlarmsPermission();
 
     // Buat notification channels
     await androidImpl?.createNotificationChannel(
@@ -124,6 +130,56 @@ class NotificationService {
       priority: Priority.high,
     );
   }
+
+  // ── Jadwalkan Pengingat Obat (harian, berulang) ─────────────────────────
+Future<void> jadwalkanNotifObat({
+  required int id,
+  required String namaObat,
+  required String dosis,
+  required String waktuLabel, // buat ditampilkan di isi notif, misal "08:00"
+  required int jam,
+  required int menit,
+}) async {
+  final androidDetails = AndroidNotificationDetails(
+    'pengingat_obat',
+    'Pengingat Obat',
+    importance: Importance.high,
+    priority: Priority.high,
+    fullScreenIntent: true,
+    category: AndroidNotificationCategory.alarm,
+    playSound: true,
+    enableVibration: true,
+  );
+
+  await _plugin.zonedSchedule(
+    id,
+    '💊 Waktunya Minum Obat!',
+    '$namaObat • $dosis • $waktuLabel',
+    _instanceJamBerikutnya(jam, menit),
+    NotificationDetails(
+      android: androidDetails,
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    ),
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    uiLocalNotificationDateInterpretation:
+        UILocalNotificationDateInterpretation.absoluteTime,
+    matchDateTimeComponents: DateTimeComponents.time, // ulang tiap hari di jam sama
+  );
+}
+
+tz.TZDateTime _instanceJamBerikutnya(int jam, int menit) {
+  final sekarang = tz.TZDateTime.now(tz.local);
+  var jadwal = tz.TZDateTime(
+      tz.local, sekarang.year, sekarang.month, sekarang.day, jam, menit);
+  if (jadwal.isBefore(sekarang)) {
+    jadwal = jadwal.add(const Duration(days: 1));
+  }
+  return jadwal;
+}
 
   // ── Dismiss ──────────────────────────────────────────────────────────────
   Future<void> dismiss(int id) => _plugin.cancel(id);
