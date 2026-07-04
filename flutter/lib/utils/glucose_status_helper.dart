@@ -15,10 +15,10 @@ String hitungStatusGula(double nilai, String? konteks) {
   if (nilai < 70) return 'Rendah';
 
   if (isKonteksSebelumTidur(konteks)) {
-    if (nilai <= 140) return 'Normal';
-    if (nilai <= 180) return 'Perlu Perhatian';
-    return 'Tinggi';
-  }
+  if (nilai < 140) return 'Normal';
+  if (nilai <= 199) return 'Perlu Perhatian';
+  return 'Tinggi';
+}
 
   final setelahMakan = isKonteksSetelahMakan(konteks);
 
