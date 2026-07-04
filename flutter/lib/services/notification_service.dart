@@ -2,6 +2,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tzdata;
 
+enum FrekuensiObat { setiapHari, sekaliSaja, hariTertentu }
+
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -132,13 +134,16 @@ class NotificationService {
   }
 
   // ── Jadwalkan Pengingat Obat (harian, berulang) ─────────────────────────
+// ── Jadwalkan Pengingat Obat ─────────────────────────────────────────────
 Future<void> jadwalkanNotifObat({
   required int id,
   required String namaObat,
   required String dosis,
-  required String waktuLabel, // buat ditampilkan di isi notif, misal "08:00"
+  required String waktuLabel,
   required int jam,
   required int menit,
+  required FrekuensiObat frekuensi,
+  List<int>? hariTerpilih, // 1=Senin ... 7=Minggu (DateTime.weekday)
 }) async {
   final androidDetails = AndroidNotificationDetails(
     'pengingat_obat',
@@ -151,24 +156,60 @@ Future<void> jadwalkanNotifObat({
     enableVibration: true,
   );
 
-  await _plugin.zonedSchedule(
-    id,
-    '💊 Waktunya Minum Obat!',
-    '$namaObat • $dosis • $waktuLabel',
-    _instanceJamBerikutnya(jam, menit),
-    NotificationDetails(
-      android: androidDetails,
-      iOS: const DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      ),
+  final details = NotificationDetails(
+    android: androidDetails,
+    iOS: const DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
     ),
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-    uiLocalNotificationDateInterpretation:
-        UILocalNotificationDateInterpretation.absoluteTime,
-    matchDateTimeComponents: DateTimeComponents.time, // ulang tiap hari di jam sama
   );
+
+  switch (frekuensi) {
+    case FrekuensiObat.setiapHari:
+      await _plugin.zonedSchedule(
+        id,
+        '💊 Waktunya Minum Obat!',
+        '$namaObat • $dosis • $waktuLabel',
+        _instanceJamBerikutnya(jam, menit),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+      break;
+
+    case FrekuensiObat.sekaliSaja:
+      await _plugin.zonedSchedule(
+        id,
+        '💊 Waktunya Minum Obat!',
+        '$namaObat • $dosis • $waktuLabel',
+        _instanceJamBerikutnya(jam, menit),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      break;
+
+    case FrekuensiObat.hariTertentu:
+      if (hariTerpilih == null || hariTerpilih.isEmpty) return;
+      for (final hari in hariTerpilih) {
+        await _plugin.zonedSchedule(
+          id * 10 + hari,
+          '💊 Waktunya Minum Obat!',
+          '$namaObat • $dosis • $waktuLabel',
+          _instanceHariBerikutnya(hari, jam, menit),
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        );
+      }
+      break;
+  }
 }
 
 tz.TZDateTime _instanceJamBerikutnya(int jam, int menit) {
@@ -181,7 +222,15 @@ tz.TZDateTime _instanceJamBerikutnya(int jam, int menit) {
   return jadwal;
 }
 
-  // ── Dismiss ──────────────────────────────────────────────────────────────
+tz.TZDateTime _instanceHariBerikutnya(int targetWeekday, int jam, int menit) {
+  var jadwal = _instanceJamBerikutnya(jam, menit);
+  while (jadwal.weekday != targetWeekday) {
+    jadwal = jadwal.add(const Duration(days: 1));
+  }
+  return jadwal;
+}
+
+// ── Dismiss ──────────────────────────────────────────────────────────────
   Future<void> dismiss(int id) => _plugin.cancel(id);
   Future<void> dismissSemua() => _plugin.cancelAll();
 
@@ -223,4 +272,4 @@ tz.TZDateTime _instanceJamBerikutnya(int jam, int menit) {
       ),
     );
   }
-}
+} // ← penutup class NotificationService

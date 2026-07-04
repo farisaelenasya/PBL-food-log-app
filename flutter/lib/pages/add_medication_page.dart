@@ -23,11 +23,42 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
   final List<Map<String, dynamic>> _daftarFrekuensi = [
     {'label': 'Setiap Hari', 'ikon': Icons.calendar_today_outlined},
-    {'label': 'Interval Jam', 'ikon': Icons.history_outlined},
-    {'label': 'Sesuai Kebutuhan', 'ikon': Icons.emergency_outlined},
+    {'label': 'Sekali Saja', 'ikon': Icons.looks_one_outlined},
+    {'label': 'Hari Tertentu', 'ikon': Icons.event_repeat_outlined},
   ];
 
-  final List<String> _chipWaktu = ['Sebelum Sarapan', '08:00'];
+  final List<String> _chipWaktu = [];
+
+  final List<String> _hariTerpilih = [];
+  final List<String> _daftarHari = [
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu',
+    'Minggu'
+  ];
+
+  final Map<String, int> _mapHariKeWeekday = {
+    'Senin': DateTime.monday,
+    'Selasa': DateTime.tuesday,
+    'Rabu': DateTime.wednesday,
+    'Kamis': DateTime.thursday,
+    'Jumat': DateTime.friday,
+    'Sabtu': DateTime.saturday,
+    'Minggu': DateTime.sunday,
+  };
+
+  void _toggleHari(String hari) {
+    setState(() {
+      if (_hariTerpilih.contains(hari)) {
+        _hariTerpilih.remove(hari);
+      } else {
+        _hariTerpilih.add(hari);
+      }
+    });
+  }
 
   final List<String> _pilihanWaktuMakan = [
     'Sebelum Sarapan',
@@ -38,16 +69,16 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     'Setelah Makan Malam',
     'Sebelum Tidur',
   ];
-  
+
   final Map<String, String> _defaultJamMakan = {
-  'Sebelum Sarapan': '06:00',
-  'Setelah Sarapan': '07:00',
-  'Sebelum Makan Siang': '11:30',
-  'Setelah Makan Siang': '12:30',
-  'Sebelum Makan Malam': '17:30',
-  'Setelah Makan Malam': '18:30',
-  'Sebelum Tidur': '21:00',
-};
+    'Sebelum Sarapan': '06:00',
+    'Setelah Sarapan': '07:00',
+    'Sebelum Makan Siang': '11:30',
+    'Setelah Makan Siang': '12:30',
+    'Sebelum Makan Malam': '17:30',
+    'Setelah Makan Malam': '18:30',
+    'Sebelum Tidur': '21:00',
+  };
 
   @override
   void dispose() {
@@ -57,63 +88,65 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     super.dispose();
   }
 
-void _tambahWaktu() async {
-    if (_indeksWaktu == 0) {
-      // Mode "Jam Spesifik" → tampilkan time picker
-      final waktu = await showTimePicker(
-        context: context,
-        initialTime: TimeOfDay.now(),
-        builder: (ctx, child) => MediaQuery(
-          data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
-          child: child!,
+  // ── Pilih jam spesifik (mode "Jam Spesifik") ────────────────
+  Future<void> _pilihJamSpesifik() async {
+    final waktu = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (ctx, child) => Theme(
+        data: ThemeData.light().copyWith(
+          colorScheme: const ColorScheme.light(primary: Color(0xFF2979FF)),
         ),
-      );
-      if (waktu != null) {
-        final jam = waktu.hour.toString().padLeft(2, '0');
-        final menit = waktu.minute.toString().padLeft(2, '0');
-        setState(() => _chipWaktu.add('$jam:$menit'));
+        child: child!,
+      ),
+    );
+    if (waktu != null) {
+      final jam = waktu.hour.toString().padLeft(2, '0');
+      final menit = waktu.minute.toString().padLeft(2, '0');
+      final waktuBaru = '$jam:$menit';
+
+      if (_chipWaktu.contains(waktuBaru)) {
+        _showSnackbar('Jam $waktuBaru sudah ditambahkan', Colors.orange);
+        return;
       }
-    } else {
-      // Mode "Waktu Makan" → tampilkan daftar label
-      showModalBottomSheet(
-        context: context,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (ctx) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Pilih Waktu',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              ..._pilihanWaktuMakan.map((w) => ListTile(
-                    title: Text(w),
-                    onTap: () {
-                      setState(() => _chipWaktu.add(w));
-                      Navigator.pop(ctx);
-                    },
-                  )),
-            ],
-          ),
-        ),
-      );
+      setState(() => _chipWaktu.add(waktuBaru));
     }
   }
 
-  void _hapusChip(int i) => setState(() => _chipWaktu.removeAt(i));
+  // ── Toggle pilih/batal waktu makan (mode "Waktu Makan") ─────
+  void _toggleWaktuMakan(String label) {
+    setState(() {
+      if (_chipWaktu.contains(label)) {
+        _chipWaktu.remove(label);
+      } else {
+        _chipWaktu.add(label);
+      }
+    });
+  }
+
+  void _hapusChip(String chip) => setState(() => _chipWaktu.remove(chip));
 
   ({int hour, int minute}) _parseJamDariChip(String chip) {
-  if (chip.contains(':')) {
-    final parts = chip.split(':');
+    if (chip.contains(':')) {
+      final parts = chip.split(':');
+      return (hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+    }
+    final default_ = _defaultJamMakan[chip] ?? '08:00';
+    final parts = default_.split(':');
     return (hour: int.parse(parts[0]), minute: int.parse(parts[1]));
   }
-  final default_ = _defaultJamMakan[chip] ?? '08:00';
-  final parts = default_.split(':');
-  return (hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-}
+
+  FrekuensiObat _toFrekuensiObat(String label) {
+    switch (label) {
+      case 'Sekali Saja':
+        return FrekuensiObat.sekaliSaja;
+      case 'Hari Tertentu':
+        return FrekuensiObat.hariTertentu;
+      case 'Setiap Hari':
+      default:
+        return FrekuensiObat.setiapHari;
+    }
+  }
 
   // ── SIMPAN via API ──────────────────────────────────────────
   void _simpan() async {
@@ -125,7 +158,11 @@ void _tambahWaktu() async {
       _showSnackbar('Tambahkan minimal 1 waktu konsumsi', Colors.redAccent);
       return;
     }
-
+    if (_daftarFrekuensi[_indeksFrekuensi]['label'] == 'Hari Tertentu' &&
+        _hariTerpilih.isEmpty) {
+      _showSnackbar('Pilih minimal 1 hari', Colors.redAccent);
+      return;
+    }
     setState(() => _sedangMenyimpan = true);
 
     try {
@@ -140,29 +177,23 @@ void _tambahWaktu() async {
         catatan: _catatanController.text.trim(),
       );
 
-      final frekuensiLabel = _daftarFrekuensi[_indeksFrekuensi]['label'] as String;
+      final frekuensiLabel =
+          _daftarFrekuensi[_indeksFrekuensi]['label'] as String;
       if (frekuensiLabel != 'Sesuai Kebutuhan') {
         final namaObat = _namaController.text.trim();
         final dosis = _dosisController.text.trim().isEmpty
             ? '-'
             : _dosisController.text.trim();
 
+        final frekuensiEnum = _toFrekuensiObat(frekuensiLabel);
+        final hariWeekday = _hariTerpilih
+            .map((h) => _mapHariKeWeekday[h])
+            .whereType<int>()
+            .toList();
+
         for (int i = 0; i < _chipWaktu.length; i++) {
           final chip = _chipWaktu[i];
-          final jamMenit = _parseJamDariChip(chip);  
-          int jam = jamMenit.hour;
-          int menit = jamMenit.minute;
-
-          if (chip.contains(':')) {
-            final parts = chip.split(':');
-            jam = int.parse(parts[0]);
-            menit = int.parse(parts[1]);
-          } else {
-            final default_ = _defaultJamMakan[chip] ?? '08:00';
-            final parts = default_.split(':');
-            jam = int.parse(parts[0]);
-            menit = int.parse(parts[1]);
-          }
+          final jamMenit = _parseJamDariChip(chip);
 
           final notifId = ('$namaObat-$chip').hashCode & 0x7FFFFFFF;
 
@@ -171,12 +202,15 @@ void _tambahWaktu() async {
             namaObat: namaObat,
             dosis: dosis,
             waktuLabel: chip,
-            jam: jam,
-            menit: menit,
+            jam: jamMenit.hour,
+            menit: jamMenit.minute,
+            frekuensi: frekuensiEnum,
+            hariTerpilih: frekuensiEnum == FrekuensiObat.hariTertentu
+                ? hariWeekday
+                : null,
           );
         }
       }
-      
 
       if (!mounted) return;
       _showSnackbar('Obat berhasil disimpan!', const Color(0xFF2979FF));
@@ -187,7 +221,8 @@ void _tambahWaktu() async {
       );
     } catch (e) {
       if (!mounted) return;
-      _showSnackbar(e.toString().replaceFirst('Exception: ', ''), Colors.redAccent);
+      _showSnackbar(
+          e.toString().replaceFirst('Exception: ', ''), Colors.redAccent);
     } finally {
       if (mounted) setState(() => _sedangMenyimpan = false);
     }
@@ -247,9 +282,7 @@ void _tambahWaktu() async {
                       margin: EdgeInsets.only(right: i < 2 ? 10 : 0),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
-                        color: dipilih
-                            ? const Color(0xFFE8F0FE)
-                            : Colors.white,
+                        color: dipilih ? const Color(0xFFE8F0FE) : Colors.white,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: dipilih
@@ -284,10 +317,51 @@ void _tambahWaktu() async {
                 );
               }),
             ),
+
+            if (_indeksFrekuensi == 2) ...[
+              const SizedBox(height: 12),
+              _buildLabel('Pilih Hari'),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _daftarHari.map((hari) {
+                  final dipilih = _hariTerpilih.contains(hari);
+                  return GestureDetector(
+                    onTap: () => _toggleHari(hari),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: dipilih ? const Color(0xFF2979FF) : Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                            color: dipilih
+                                ? const Color(0xFF2979FF)
+                                : Colors.grey[300]!),
+                      ),
+                      child: Text(
+                        hari,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight:
+                              dipilih ? FontWeight.bold : FontWeight.normal,
+                          color: dipilih ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+
             const SizedBox(height: 20),
 
             _buildLabel('Waktu Konsumsi'),
             const SizedBox(height: 10),
+
+            // Toggle mode: Jam Spesifik / Waktu Makan
             Row(
               children: [
                 Expanded(
@@ -373,57 +447,120 @@ void _tambahWaktu() async {
             ),
             const SizedBox(height: 12),
 
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ..._chipWaktu.asMap().entries.map((e) => Container(
+            // ── Konten sesuai mode, bergaya seperti AddGlucosePage ──
+            if (_indeksWaktu == 0)
+              // Mode Jam Spesifik → box tap-to-pick
+              GestureDetector(
+                onTap: _pilihJamSpesifik,
+                child: Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 6)
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Ketuk untuk pilih jam',
+                          style:
+                              TextStyle(fontSize: 14, color: Colors.grey[500])),
+                      const Icon(Icons.access_time_outlined,
+                          size: 18, color: Color(0xFF2979FF)),
+                    ],
+                  ),
+                ),
+              )
+            else
+              // Mode Waktu Makan → Wrap chip pilih-langsung
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _pilihanWaktuMakan.map((w) {
+                  final dipilih = _chipWaktu.contains(w);
+                  return GestureDetector(
+                    onTap: () => _toggleWaktuMakan(w),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 7),
+                          horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.grey[300]!),
+                        color: dipilih ? const Color(0xFF2979FF) : Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: dipilih
+                              ? const Color(0xFF2979FF)
+                              : Colors.grey[300]!,
+                        ),
+                        boxShadow: dipilih
+                            ? [
+                                const BoxShadow(
+                                    color: Color(0x332979FF),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 3))
+                              ]
+                            : [],
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(e.value,
-                              style: const TextStyle(
-                                  fontSize: 13, color: Color(0xFF1A1A2E))),
-                          const SizedBox(width: 6),
-                          GestureDetector(
-                            onTap: () => _hapusChip(e.key),
-                            child: Icon(Icons.close,
-                                size: 14, color: Colors.grey[500]),
-                          ),
-                        ],
+                      child: Text(
+                        w,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight:
+                              dipilih ? FontWeight.bold : FontWeight.normal,
+                          color: dipilih ? Colors.white : Colors.black87,
+                        ),
                       ),
-                    )),
-                GestureDetector(
-                  onTap: _tambahWaktu,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 7),
+                    ),
+                  );
+                }).toList(),
+              ),
+
+            const SizedBox(height: 12),
+
+            // Daftar jam spesifik yang sudah dipilih
+            if (_indeksWaktu == 0 &&
+                _chipWaktu.where((c) => c.contains(':')).isNotEmpty)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _chipWaktu.where((c) => c.contains(':')).map((jam) {
+                  return Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
-                      color: Colors.transparent,
+                      color: const Color(0xFFE8F0FE),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey[400]!),
+                      border: Border.all(color: const Color(0xFF2979FF)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.add, size: 14, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text('Tambah Waktu',
-                            style: TextStyle(
-                                fontSize: 13, color: Colors.grey[600])),
+                        const Icon(Icons.access_time,
+                            size: 14, color: Color(0xFF2979FF)),
+                        const SizedBox(width: 6),
+                        Text(jam,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF2979FF),
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: () => _hapusChip(jam),
+                          child: const Icon(Icons.close,
+                              size: 14, color: Color(0xFF2979FF)),
+                        ),
                       ],
                     ),
-                  ),
-                ),
-              ],
-            ),
+                  );
+                }).toList(),
+              ),
+
             const SizedBox(height: 20),
 
             Row(
@@ -453,8 +590,7 @@ void _tambahWaktu() async {
                 maxLines: 4,
                 decoration: InputDecoration(
                   hintText: 'Contoh: Diminum dengan air putih hangat',
-                  hintStyle:
-                      TextStyle(color: Colors.grey[400], fontSize: 13),
+                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide.none,
@@ -549,8 +685,7 @@ void _tambahWaktu() async {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03), blurRadius: 6)
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6)
         ],
       ),
       child: TextField(

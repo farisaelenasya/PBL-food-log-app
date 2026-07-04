@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/medication_store.dart';
+import '../services/medication_service.dart';
 import '../models/medication_entry.dart';
 import 'add_medication_page.dart';
 import 'notifikasi_page.dart';
@@ -12,9 +12,12 @@ class InsulinTrackerPage extends StatefulWidget {
 }
 
 class _InsulinTrackerPageState extends State<InsulinTrackerPage> {
-  final _store = MedicationStore();
-
-  String _formatWaktu(DateTime dt) {
+  final _service = MedicationService();
+  List<MedicationEntry> _daftarObat = [];
+  bool _loading = true;
+  String? _error;
+ 
+ String _formatWaktu(DateTime dt) {
     final now = DateTime.now();
     final diff = now.difference(dt);
     if (diff.inMinutes < 1) return 'Baru saja';
@@ -25,7 +28,7 @@ class _InsulinTrackerPageState extends State<InsulinTrackerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final daftarObat = _store.semuaObat;
+    final daftarObat = _daftarObat;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
@@ -46,38 +49,60 @@ class _InsulinTrackerPageState extends State<InsulinTrackerPage> {
           ),
         ],
       ),
-      body: daftarObat.isEmpty
-          ? _buildKosong()
-          : ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                const SizedBox(height: 8),
-                _buildRingkasan(daftarObat),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Daftar Obat', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
-                    Text('${daftarObat.length} obat', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ...daftarObat.map((obat) => _buildKartuObat(obat)),
-                const SizedBox(height: 80),
-              ],
-            ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF2979FF),
-        foregroundColor: Colors.white,
-        onPressed: () async {
-          await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddMedicationPage()));
-          setState(() {});
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Tambah Obat', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(child: Text('Gagal memuat: $_error'))
+              : daftarObat.isEmpty
+                  ? _buildKosong()
+                  : ListView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        const SizedBox(height: 8),
+                        _buildRingkasan(daftarObat),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Daftar Obat', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
+                            Text('${daftarObat.length} obat', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        ...daftarObat.map((obat) => _buildKartuObat(obat)),
+                        const SizedBox(height: 80),
+                      ],
+                    ),
     );
   }
+
+  @override
+  void initState() {
+    super.initState();
+    _muatData();
+  }
+
+  Future<void> _muatData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await _service.getMedications();
+      setState(() {
+        _daftarObat = data
+            .map((e) => MedicationEntry.fromJson(e as Map<String, dynamic>))
+            .toList();
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
+    }
+  }
+
 
   Widget _buildRingkasan(List<MedicationEntry> daftarObat) {
     return Container(
@@ -189,9 +214,9 @@ class _InsulinTrackerPageState extends State<InsulinTrackerPage> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () async {
-              await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddMedicationPage()));
-              setState(() {});
-            },
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddMedicationPage()));
+            _muatData();
+           },
             icon: const Icon(Icons.add),
             label: const Text('Tambah Obat'),
           ),

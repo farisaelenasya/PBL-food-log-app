@@ -58,7 +58,7 @@ class MedicationService {
       }),
     );
 
-    return response.statusCode == 200;
+    return response.statusCode == 200 || response.statusCode == 201;
   }
 
   Future<bool> deleteMedication(int id) async {
