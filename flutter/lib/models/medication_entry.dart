@@ -6,6 +6,7 @@ class MedicationEntry {
   final String waktuKonsumsi;
   final String tipe; // 'jam' atau 'makan'
   final String catatan;
+  final List<String> hariTerpilih;
   final DateTime dibuatPada;
 
   MedicationEntry({
@@ -16,6 +17,7 @@ class MedicationEntry {
     required this.waktuKonsumsi,
     required this.tipe,
     this.catatan = '',
+    this.hariTerpilih = const [],
     required this.dibuatPada,
   });
 
@@ -28,9 +30,12 @@ class MedicationEntry {
       waktuKonsumsi: json['waktu_konsumsi'] ?? '-',
       tipe: json['tipe'] ?? 'jam',
       catatan: json['catatan'] ?? '',
+      hariTerpilih: json['hari_terpilih'] != null
+          ? List<String>.from(json['hari_terpilih'])
+          : [],
       dibuatPada: json['dibuat_pada'] != null
-    ? DateTime.tryParse(json['dibuat_pada']) ?? DateTime.now()
-    : DateTime.now(),
+          ? DateTime.tryParse(json['dibuat_pada']) ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 }

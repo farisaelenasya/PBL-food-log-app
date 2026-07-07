@@ -19,6 +19,7 @@ class MedicationResource extends JsonResource
             'catatan'         => $this->catatan,
             'dibuat_pada'     => $this->created_at?->toIso8601String(),
             'diperbarui_pada' => $this->updated_at?->toIso8601String(),
+            'hari_terpilih' => $this->hari_terpilih ?? [],
         ];
     }
 }

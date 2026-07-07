@@ -18,8 +18,8 @@ class NotificationService {
   Future<void> init() async {
     if (_initialized) return;
 
-     tzdata.initializeTimeZones();                    
-  tz.setLocalLocation(tz.getLocation('Asia/Jakarta')); 
+    tzdata.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
 
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -36,9 +36,8 @@ class NotificationService {
     await _plugin.initialize(initSettings);
 
     // Minta izin notifikasi Android 13+
-    final androidImpl = _plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     await androidImpl?.requestNotificationsPermission();
     await androidImpl?.requestExactAlarmsPermission();
 
@@ -77,7 +76,8 @@ class NotificationService {
       channelId: 'gula_darah_alert',
       channelNama: 'Alert Gula Darah',
       judul: '🔴 Gula Darah Terlalu Tinggi!',
-      isi: 'Kadar gula ${nilai.toStringAsFixed(0)} mg/dL saat $konteks. Batasi karbohidrat & tetap aktif.',
+      isi:
+          'Kadar gula ${nilai.toStringAsFixed(0)} mg/dL saat $konteks. Batasi karbohidrat & tetap aktif.',
       importance: Importance.max,
       priority: Priority.high,
       bigText:
@@ -95,7 +95,8 @@ class NotificationService {
       channelId: 'gula_darah_alert',
       channelNama: 'Alert Gula Darah',
       judul: '⚠️ Gula Darah Terlalu Rendah!',
-      isi: 'Kadar gula ${nilai.toStringAsFixed(0)} mg/dL saat $konteks. Segera konsumsi makanan manis!',
+      isi:
+          'Kadar gula ${nilai.toStringAsFixed(0)} mg/dL saat $konteks. Segera konsumsi makanan manis!',
       importance: Importance.max,
       priority: Priority.high,
       bigText:
@@ -110,7 +111,8 @@ class NotificationService {
       channelId: 'gula_darah_alert',
       channelNama: 'Alert Gula Darah',
       judul: '✅ Gula Darah Kembali Normal',
-      isi: 'Kadar gula ${nilai.toStringAsFixed(0)} mg/dL — dalam batas normal. Pertahankan! 💪',
+      isi:
+          'Kadar gula ${nilai.toStringAsFixed(0)} mg/dL — dalam batas normal. Pertahankan! 💪',
       importance: Importance.defaultImportance,
       priority: Priority.defaultPriority,
     );
@@ -133,102 +135,141 @@ class NotificationService {
     );
   }
 
-  // ── Jadwalkan Pengingat Obat (harian, berulang) ─────────────────────────
-// ── Jadwalkan Pengingat Obat ─────────────────────────────────────────────
-Future<void> jadwalkanNotifObat({
-  required int id,
-  required String namaObat,
-  required String dosis,
-  required String waktuLabel,
-  required int jam,
-  required int menit,
-  required FrekuensiObat frekuensi,
-  List<int>? hariTerpilih, // 1=Senin ... 7=Minggu (DateTime.weekday)
-}) async {
-  final androidDetails = AndroidNotificationDetails(
-    'pengingat_obat',
-    'Pengingat Obat',
-    importance: Importance.high,
-    priority: Priority.high,
-    fullScreenIntent: true,
-    category: AndroidNotificationCategory.alarm,
-    playSound: true,
-    enableVibration: true,
-  );
+// ── Jadwalkan Pengingat Obat (harian, berulang) ─────────────────────────
+  Future<void> jadwalkanNotifObat({
+    required int id,
+    required String namaObat,
+    required String dosis,
+    required String waktuLabel,
+    required int jam,
+    required int menit,
+    required FrekuensiObat frekuensi,
+    List<int>? hariTerpilih,
+  }) async {
+    final androidDetails = AndroidNotificationDetails(
+      'pengingat_obat',
+      'Pengingat Obat',
+      importance: Importance.high,
+      priority: Priority.high,
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.alarm,
+      playSound: true,
+      enableVibration: true,
+    );
 
-  final details = NotificationDetails(
-    android: androidDetails,
-    iOS: const DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    ),
-  );
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
 
-  switch (frekuensi) {
-    case FrekuensiObat.setiapHari:
-      await _plugin.zonedSchedule(
-        id,
-        '💊 Waktunya Minum Obat!',
-        '$namaObat • $dosis • $waktuLabel',
-        _instanceJamBerikutnya(jam, menit),
-        details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
-      );
-      break;
-
-    case FrekuensiObat.sekaliSaja:
-      await _plugin.zonedSchedule(
-        id,
-        '💊 Waktunya Minum Obat!',
-        '$namaObat • $dosis • $waktuLabel',
-        _instanceJamBerikutnya(jam, menit),
-        details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
-      break;
-
-    case FrekuensiObat.hariTertentu:
-      if (hariTerpilih == null || hariTerpilih.isEmpty) return;
-      for (final hari in hariTerpilih) {
+    switch (frekuensi) {
+      case FrekuensiObat.setiapHari:
         await _plugin.zonedSchedule(
-          id * 10 + hari,
+          id,
           '💊 Waktunya Minum Obat!',
           '$namaObat • $dosis • $waktuLabel',
-          _instanceHariBerikutnya(hari, jam, menit),
+          _instanceJamBerikutnya(jam, menit),
           details,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
-          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          matchDateTimeComponents: DateTimeComponents.time,
         );
-      }
-      break;
-  }
-}
+        break;
 
-tz.TZDateTime _instanceJamBerikutnya(int jam, int menit) {
-  final sekarang = tz.TZDateTime.now(tz.local);
-  var jadwal = tz.TZDateTime(
-      tz.local, sekarang.year, sekarang.month, sekarang.day, jam, menit);
-  if (jadwal.isBefore(sekarang)) {
-    jadwal = jadwal.add(const Duration(days: 1));
-  }
-  return jadwal;
-}
+      case FrekuensiObat.sekaliSaja:
+        await _plugin.zonedSchedule(
+          id,
+          '💊 Waktunya Minum Obat!',
+          '$namaObat • $dosis • $waktuLabel',
+          _instanceJamBerikutnya(jam, menit),
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+        break;
 
-tz.TZDateTime _instanceHariBerikutnya(int targetWeekday, int jam, int menit) {
-  var jadwal = _instanceJamBerikutnya(jam, menit);
-  while (jadwal.weekday != targetWeekday) {
-    jadwal = jadwal.add(const Duration(days: 1));
+      case FrekuensiObat.hariTertentu:
+        if (hariTerpilih == null || hariTerpilih.isEmpty) return;
+        for (final hari in hariTerpilih) {
+          await _plugin.zonedSchedule(
+            id * 10 + hari,
+            '💊 Waktunya Minum Obat!',
+            '$namaObat • $dosis • $waktuLabel',
+            _instanceHariBerikutnya(hari, jam, menit),
+            details,
+            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          );
+        }
+        break;
+    }
   }
-  return jadwal;
-}
+
+  Future<void> tundaNotifikasi({
+    required int id,
+    required String namaObat,
+    required String dosis,
+    int menit = 30,
+  }) async {
+    final waktuBaru = tz.TZDateTime.now(tz.local).add(Duration(minutes: menit));
+
+    final androidDetails = AndroidNotificationDetails(
+      'pengingat_obat',
+      'Pengingat Obat',
+      importance: Importance.high,
+      priority: Priority.high,
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.alarm,
+      playSound: true,
+      enableVibration: true,
+    );
+
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
+
+    await _plugin.zonedSchedule(
+      id,
+      '💊 Waktunya Minum Obat!',
+      '$namaObat • $dosis (ditunda)',
+      waktuBaru,
+      details,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  tz.TZDateTime _instanceJamBerikutnya(int jam, int menit) {
+    final sekarang = tz.TZDateTime.now(tz.local);
+    var jadwal = tz.TZDateTime(
+        tz.local, sekarang.year, sekarang.month, sekarang.day, jam, menit);
+    if (jadwal.isBefore(sekarang)) {
+      jadwal = jadwal.add(const Duration(days: 1));
+    }
+    return jadwal;
+  }
+
+  tz.TZDateTime _instanceHariBerikutnya(int targetWeekday, int jam, int menit) {
+    var jadwal = _instanceJamBerikutnya(jam, menit);
+    while (jadwal.weekday != targetWeekday) {
+      jadwal = jadwal.add(const Duration(days: 1));
+    }
+    return jadwal;
+  }
 
 // ── Dismiss ──────────────────────────────────────────────────────────────
   Future<void> dismiss(int id) => _plugin.cancel(id);

@@ -12,24 +12,28 @@ class MedicationService {
   }
 
   Future<List<dynamic>> getMedications() async {
-    final token = await _getToken();
+  final token = await _getToken();
+  print('DEBUG token: $token'); // sementara, cek dulu tokennya ada atau null
 
-    final response = await http.get(
-      Uri.parse('$baseUrl/medications'),
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+  final response = await http.get(
+    Uri.parse('$baseUrl/medications'),
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    },
+  );
 
-    final data = jsonDecode(response.body);
+  print('DEBUG status: ${response.statusCode}');
+  print('DEBUG body: ${response.body}');
 
-    if (response.statusCode == 200) {
-      return data['data'];
-    }
+  final data = jsonDecode(response.body);
 
-    throw Exception('Gagal mengambil data obat');
+  if (response.statusCode == 200) {
+    return data['data'];
   }
+
+  throw Exception('Gagal mengambil data obat (${response.statusCode}): ${data['message'] ?? response.body}');
+}
 
   Future<bool> addMedication({
     required String namaObat,
@@ -38,6 +42,7 @@ class MedicationService {
     required String waktuKonsumsi,
     required String tipe,
     String catatan = '',
+    List<String> hariTerpilih = const [],
   }) async {
     final token = await _getToken();
 
@@ -55,10 +60,44 @@ class MedicationService {
         'waktu_konsumsi': waktuKonsumsi,
         'tipe': tipe,
         'catatan': catatan,
+        'hari_terpilih': hariTerpilih,
       }),
     );
 
     return response.statusCode == 200 || response.statusCode == 201;
+  }
+
+  Future<bool> updateMedication({
+    required int id,
+    required String namaObat,
+    required String dosis,
+    required String frekuensi,
+    required String waktuKonsumsi,
+    required String tipe,
+    String catatan = '',
+    List<String> hariTerpilih = const [],
+  }) async {
+    final token = await _getToken();
+
+    final response = await http.put(
+      Uri.parse('$baseUrl/medications/$id'),
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'nama_obat': namaObat,
+        'dosis': dosis,
+        'frekuensi': frekuensi,
+        'waktu_konsumsi': waktuKonsumsi,
+        'tipe': tipe,
+        'catatan': catatan,
+        'hari_terpilih': hariTerpilih,
+      }),
+    );
+
+    return response.statusCode == 200;
   }
 
   Future<bool> deleteMedication(int id) async {

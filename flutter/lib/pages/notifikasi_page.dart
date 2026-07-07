@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/glucose_store.dart';
 import '../models/glucose_entry.dart';
 import '../services/medication_service.dart';
+import '../services/medication_log_service.dart';
+import '../services/notification_service.dart';
 
 // ─── Model Notifikasi ────────────────────────────────────────────────────────
 
@@ -9,19 +11,27 @@ enum TipeNotif { gulaRendah, gulaTinggi, obat, info }
 
 class ItemNotif {
   final String id;
+  final int? obatId;
   final TipeNotif tipe;
   final String judul;
   final String isi;
   final DateTime waktu;
+  final String namaObat;
+  final String dosis;
   bool sudahDibaca;
+  String? statusAksi; // null | 'diminum' | 'ditunda'
 
   ItemNotif({
     required this.id,
+    this.obatId,
     required this.tipe,
     required this.judul,
     required this.isi,
     required this.waktu,
+    this.namaObat = '-',
+    this.dosis = '-',
     this.sudahDibaca = false,
+    this.statusAksi,
   });
 }
 
@@ -60,18 +70,23 @@ class NotifService {
     return hasil;
   }
 
-  // Terima List<Map> dari API (bukan MedicationEntry lagi)
   static List<ItemNotif> buatNotifObat(List<dynamic> obatList) {
     return obatList.asMap().entries.map((entry) {
       final o = entry.value as Map<String, dynamic>;
+      final idRaw = o['id'];
+      final obatId = idRaw is int ? idRaw : int.tryParse('$idRaw');
+
       return ItemNotif(
         id: 'obat_${o['id'] ?? entry.key}',
+        obatId: obatId,
         tipe: TipeNotif.obat,
         judul: '💊 Pengingat Obat',
         isi: 'Waktunya minum ${o['nama_obat']} — ${o['dosis']} (${o['frekuensi']}).',
         waktu: o['dibuat_pada'] != null
             ? DateTime.tryParse(o['dibuat_pada']) ?? DateTime.now()
             : DateTime.now(),
+        namaObat: o['nama_obat'] ?? '-',
+        dosis: o['dosis'] ?? '-',
         sudahDibaca: entry.key > 0,
       );
     }).toList();
@@ -108,7 +123,8 @@ class NotifikasiPage extends StatefulWidget {
 
 class _NotifikasiPageState extends State<NotifikasiPage> {
   final _glucoseStore = GlucoseStore();
-  final _medService = MedicationService(); // ← pakai service
+  final _medService = MedicationService();
+  final _logService = MedicationLogService();
 
   List<ItemNotif> _semuaNotif = [];
   bool _sedangMemuat = true;
@@ -168,6 +184,63 @@ class _NotifikasiPageState extends State<NotifikasiPage> {
 
   void _hapus(String id) {
     setState(() => _semuaNotif.removeWhere((n) => n.id == id));
+  }
+
+  // ── Aksi tombol "Sudah Diminum" ─────────────────────────────
+  Future<void> _sudahDiminum(ItemNotif notif) async {
+    if (notif.obatId == null) return;
+    try {
+      await _logService.catatDiminum(notif.obatId!);
+      setState(() => notif.statusAksi = 'diminum');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tercatat sudah diminum'),
+          backgroundColor: Color(0xFF2E7D32),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal mencatat: ${e.toString().replaceFirst('Exception: ', '')}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  // ── Aksi tombol "Tunda" ──────────────────────────────────────
+  Future<void> _tunda(ItemNotif notif) async {
+    if (notif.obatId == null) return;
+    try {
+      await _logService.catatTunda(notif.obatId!, menit: 30);
+
+      final notifId = (9000000 + notif.obatId!) & 0x7FFFFFFF;
+      await NotificationService().tundaNotifikasi(
+        id: notifId,
+        namaObat: notif.namaObat,
+        dosis: notif.dosis,
+        menit: 30,
+      );
+
+      setState(() => notif.statusAksi = 'ditunda');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Diingatkan lagi 30 menit lagi'),
+          backgroundColor: Colors.grey,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menunda: ${e.toString().replaceFirst('Exception: ', '')}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   String _formatWaktu(DateTime dt) {
@@ -268,8 +341,6 @@ class _NotifikasiPageState extends State<NotifikasiPage> {
       ),
     );
   }
-
-  // ── Error state ──
 
   Widget _buildError() {
     return Center(
@@ -557,15 +628,47 @@ class _NotifikasiPageState extends State<NotifikasiPage> {
                       ),
                       if (notif.tipe == TipeNotif.obat) ...[
                         const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            _tombolAksi('✓ Sudah Diminum',
-                                const Color(0xFF2E7D32), const Color(0xFFC8E6C9)),
-                            const SizedBox(width: 8),
-                            _tombolAksi(
-                                'Tunda', Colors.grey[600]!, Colors.grey[100]!),
-                          ],
-                        ),
+                        if (notif.statusAksi == null)
+                          Row(
+                            children: [
+                              _tombolAksi(
+                                '✓ Sudah Diminum',
+                                const Color(0xFF2E7D32),
+                                const Color(0xFFC8E6C9),
+                                () => _sudahDiminum(notif),
+                              ),
+                              const SizedBox(width: 8),
+                              _tombolAksi(
+                                'Tunda',
+                                Colors.grey[600]!,
+                                Colors.grey[100]!,
+                                () => _tunda(notif),
+                              ),
+                            ],
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: notif.statusAksi == 'diminum'
+                                  ? const Color(0xFFE8F5E9)
+                                  : Colors.grey[100],
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              notif.statusAksi == 'diminum'
+                                  ? '✓ Sudah diminum'
+                                  : '⏰ Ditunda 30 menit',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: notif.statusAksi == 'diminum'
+                                    ? const Color(0xFF2E7D32)
+                                    : Colors.grey[600],
+                              ),
+                            ),
+                          ),
                       ],
                     ],
                   ),
@@ -578,9 +681,10 @@ class _NotifikasiPageState extends State<NotifikasiPage> {
     );
   }
 
-  Widget _tombolAksi(String label, Color warnaTeks, Color warnaBg) {
+  Widget _tombolAksi(
+      String label, Color warnaTeks, Color warnaBg, VoidCallback onTap) {
     return GestureDetector(
-      onTap: () {},
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(

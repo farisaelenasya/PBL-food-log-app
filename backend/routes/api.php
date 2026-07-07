@@ -12,9 +12,12 @@ use App\Http\Controllers\Api\PointController;
 use App\Http\Controllers\Api\ArtikelController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\MedicationLogController;
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('medications', MedicationController::class);
+    Route::post('/medication-logs', [MedicationLogController::class, 'store']);
+    Route::get('/medication-logs', [MedicationLogController::class, 'index']);
     Route::get('profile', [ProfileController::class, 'show']);
     Route::put('profile', [ProfileController::class, 'update']);
     Route::post('/profile', [ProfileController::class, 'update']);

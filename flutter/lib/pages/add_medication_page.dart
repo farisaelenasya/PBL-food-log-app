@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../services/medication_service.dart';
 import '../services/notification_service.dart';
-import 'notifikasi_page.dart';
+import '../models/medication_entry.dart';
 
 class AddMedicationPage extends StatefulWidget {
-  const AddMedicationPage({super.key});
+  final MedicationEntry? medication;
+
+  const AddMedicationPage({super.key, this.medication});
 
   @override
   State<AddMedicationPage> createState() => _AddMedicationPageState();
@@ -20,6 +22,28 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   bool _sedangMenyimpan = false;
 
   final _service = MedicationService(); // ← pakai service
+  bool get _modeEdit => widget.medication != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_modeEdit) {
+      final obat = widget.medication!;
+      _namaController.text = obat.namaObat;
+      _dosisController.text = obat.dosis == '-' ? '' : obat.dosis;
+      _catatanController.text = obat.catatan;
+
+      _indeksFrekuensi = _daftarFrekuensi.indexWhere((f) => f['label'] == obat.frekuensi);
+      if (_indeksFrekuensi == -1) _indeksFrekuensi = 0;
+
+      _indeksWaktu = obat.tipe == 'makan' ? 1 : 0;
+
+      _chipWaktu.addAll(
+        obat.waktuKonsumsi.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty),
+      );
+      _hariTerpilih.addAll(obat.hariTerpilih);   
+    }
+  }
 
   final List<Map<String, dynamic>> _daftarFrekuensi = [
     {'label': 'Setiap Hari', 'ikon': Icons.calendar_today_outlined},
@@ -148,6 +172,26 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     }
   }
 
+ Future<void> _batalkanNotifLama(MedicationEntry obatLama) async {
+    final frekuensiEnumLama = _toFrekuensiObat(obatLama.frekuensi);
+    final chipsLama = obatLama.waktuKonsumsi
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty);
+
+    for (final chip in chipsLama) {
+      final notifIdLama = ('${obatLama.namaObat}-$chip').hashCode & 0x7FFFFFFF;
+
+      if (frekuensiEnumLama == FrekuensiObat.hariTertentu) {
+        for (int hari = 1; hari <= 7; hari++) {
+          await NotificationService().dismiss(notifIdLama * 10 + hari);
+        }
+      } else {
+        await NotificationService().dismiss(notifIdLama);
+      }
+    }
+  }
+
   // ── SIMPAN via API ──────────────────────────────────────────
   void _simpan() async {
     if (_namaController.text.trim().isEmpty) {
@@ -166,25 +210,38 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     setState(() => _sedangMenyimpan = true);
 
     try {
-      await _service.addMedication(
-        namaObat: _namaController.text.trim(),
-        dosis: _dosisController.text.trim().isEmpty
-            ? '-'
-            : _dosisController.text.trim(),
-        frekuensi: _daftarFrekuensi[_indeksFrekuensi]['label'] as String,
-        waktuKonsumsi: _chipWaktu.join(', '),
-        tipe: _indeksWaktu == 0 ? 'jam' : 'makan',
-        catatan: _catatanController.text.trim(),
-      );
-
+      final namaObat = _namaController.text.trim();
+      final dosis = _dosisController.text.trim().isEmpty
+          ? '-'
+          : _dosisController.text.trim();
       final frekuensiLabel =
           _daftarFrekuensi[_indeksFrekuensi]['label'] as String;
-      if (frekuensiLabel != 'Sesuai Kebutuhan') {
-        final namaObat = _namaController.text.trim();
-        final dosis = _dosisController.text.trim().isEmpty
-            ? '-'
-            : _dosisController.text.trim();
 
+      if (_modeEdit) {
+       await _service.updateMedication(
+          id: widget.medication!.id!,
+          namaObat: namaObat,
+          dosis: dosis,
+          frekuensi: frekuensiLabel,
+          waktuKonsumsi: _chipWaktu.join(', '),
+          tipe: _indeksWaktu == 0 ? 'jam' : 'makan',
+          catatan: _catatanController.text.trim(),
+          hariTerpilih: _hariTerpilih,   // ← baris baru ini
+        );
+        await _batalkanNotifLama(widget.medication!);
+      } else {
+        await _service.addMedication(
+          namaObat: namaObat,
+          dosis: dosis,
+          frekuensi: frekuensiLabel,
+          waktuKonsumsi: _chipWaktu.join(', '),
+          tipe: _indeksWaktu == 0 ? 'jam' : 'makan',
+          catatan: _catatanController.text.trim(),
+          hariTerpilih: _hariTerpilih,   // ← baris baru ini
+        );
+      }
+
+      if (frekuensiLabel != 'Sesuai Kebutuhan') {
         final frekuensiEnum = _toFrekuensiObat(frekuensiLabel);
         final hariWeekday = _hariTerpilih
             .map((h) => _mapHariKeWeekday[h])
@@ -194,7 +251,6 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         for (int i = 0; i < _chipWaktu.length; i++) {
           final chip = _chipWaktu[i];
           final jamMenit = _parseJamDariChip(chip);
-
           final notifId = ('$namaObat-$chip').hashCode & 0x7FFFFFFF;
 
           await NotificationService().jadwalkanNotifObat(
@@ -213,12 +269,11 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       }
 
       if (!mounted) return;
-      _showSnackbar('Obat berhasil disimpan!', const Color(0xFF2979FF));
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const NotifikasiPage()),
+      _showSnackbar(
+        _modeEdit ? 'Obat berhasil diperbarui!' : 'Obat berhasil disimpan!',
+        const Color(0xFF2979FF),
       );
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       _showSnackbar(
@@ -245,8 +300,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
           icon: const Icon(Icons.arrow_back, color: Color(0xFF1A1A2E)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Tambah Obat Baru',
-            style: TextStyle(
+        title: Text(_modeEdit ? 'Edit Obat' : 'Tambah Obat Baru',
+            style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF1A1A2E))),
@@ -658,7 +713,9 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                             color: Colors.white, strokeWidth: 2))
                     : const Icon(Icons.save_outlined, size: 20),
                 label: Text(
-                  _sedangMenyimpan ? 'Menyimpan...' : 'Simpan Obat',
+                  _sedangMenyimpan
+                      ? (_modeEdit ? 'Memperbarui...' : 'Menyimpan...')
+                      : (_modeEdit ? 'Perbarui Obat' : 'Simpan Obat'),
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.bold),
                 ),

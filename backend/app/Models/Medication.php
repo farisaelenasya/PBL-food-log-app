@@ -14,6 +14,11 @@ class Medication extends Model
         'waktu_konsumsi',
         'tipe',
         'catatan',
+        'hari_terpilih',
+    ];
+
+    protected $casts = [
+        'hari_terpilih' => 'array',
     ];
 
     public function user()
