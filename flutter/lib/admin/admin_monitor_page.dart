@@ -227,7 +227,7 @@ class _AdminMonitorPageState extends State<AdminMonitorPage> {
               ),
               const SizedBox(width: 10),
               const Text(
-                'Wefiname',
+                'Monitoring Pasien',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,

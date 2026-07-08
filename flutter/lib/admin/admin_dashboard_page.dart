@@ -206,7 +206,7 @@ Future<void> _logout() async {
             Text(sapaan,
                 style: const TextStyle(
                     fontSize: 12, color: Color(0xFF90A4AE))),
-            const Text('Admin Panel',
+            const Text('Admin Food log',
                 style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
