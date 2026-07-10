@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Glucose;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class GlucoseController extends Controller
@@ -26,26 +27,77 @@ class GlucoseController extends Controller
         ]);
     }
 
+
     public function store(Request $request)
     {
         Log::info('Data masuk:', $request->all());
 
         $validated = $request->validate([
-         'glucose_level' => 'required|integer|min:1',
-         'konteks_makan' => 'nullable|string',
-         'catatan' => 'nullable|string',
+            'glucose_level' => 'required|integer|min:1',
+            'konteks_makan' => 'nullable|string',
+            'catatan' => 'nullable|string',
         ]);
 
-        $validated['user_id'] = auth()->id();
+
+        $userId = auth()->id();
+
+
+        $validated['user_id'] = $userId;
         $validated['patient_name'] = auth()->user()->name;
 
+
         $glucose = Glucose::create($validated);
+
 
         $glucose->status = $this->statusGlukosa($glucose->glucose_level);
         $glucose->kategori = $this->kategoriWHO($glucose->glucose_level);
 
-        return response()->json($glucose, 201);
+
+
+        // ==========================
+        // TAMBAH POIN USER LOGIN +10
+        // ==========================
+
+        DB::table('user_points')
+            ->updateOrInsert(
+                [
+                    'user_id' => $userId
+                ],
+                [
+                    'total_poin' => DB::raw('COALESCE(total_poin,0) + 10')
+                ]
+            );
+
+
+        // ==========================
+        // HITUNG LEVEL USER
+        // ==========================
+
+        $totalPoin = DB::table('user_points')
+            ->where('user_id', $userId)
+            ->value('total_poin');
+
+
+        $level = floor($totalPoin / 200) + 1;
+
+
+        DB::table('user_points')
+            ->where('user_id', $userId)
+            ->update([
+                'level_user' => $level
+            ]);
+
+
+
+        return response()->json([
+            'point_didapat' => 10,
+            'total_poin' => $totalPoin,
+            'level' => $level,
+            'data' => $glucose,
+        ], 201);
     }
+
+
 
     private function statusGlukosa(int $level): string
     {
@@ -53,46 +105,56 @@ class GlucoseController extends Controller
         if ($level <= 99) return 'Normal';
         if ($level <= 125) return 'Pra-Diabetes';
         if ($level <= 199) return 'Diabetes';
+
         return 'Diabetes Kritis';
     }
+
+
 
     private function kategoriWHO(int $level): array
     {
         if ($level < 70) {
             return [
-                'label' => 'Hipoglikemia',
-                'warna' => '#FF6B35',
-                'keterangan' => 'Gula darah terlalu rendah (<70 mg/dL). Segera konsumsi makanan/minuman manis.',
-                'tindakan' => 'Konsumsi 15-20g karbohidrat cepat serap'
-            ];
-        } elseif ($level <= 99) {
-            return [
-                'label' => 'Normal (Puasa)',
-                'warna' => '#4CAF50',
-                'keterangan' => 'Gula darah normal saat puasa (70-99 mg/dL) sesuai standar WHO.',
-                'tindakan' => 'Pertahankan pola makan sehat'
-            ];
-        } elseif ($level <= 125) {
-            return [
-                'label' => 'Pra-Diabetes',
-                'warna' => '#FFA726',
-                'keterangan' => 'Gula darah puasa terganggu (100-125 mg/dL). Risiko diabetes meningkat.',
-                'tindakan' => 'Ubah gaya hidup, kurangi gula dan karbohidrat'
-            ];
-        } elseif ($level <= 199) {
-            return [
-                'label' => 'Diabetes',
-                'warna' => '#F44336',
-                'keterangan' => 'Gula darah tinggi (126-199 mg/dL). Memenuhi kriteria diabetes WHO.',
-                'tindakan' => 'Segera konsultasi dokter'
-            ];
-        } else {
-            return [
-                'label' => 'Diabetes Kritis',
-                'warna' => '#B71C1C',
-                'keterangan' => 'Gula darah sangat tinggi (≥200 mg/dL). Kondisi darurat medis.',
-                'tindakan' => 'Segera ke IGD atau hubungi dokter'
+                'label'=>'Hipoglikemia',
+                'warna'=>'#FF6B35',
+                'keterangan'=>'Gula darah terlalu rendah (<70 mg/dL).',
+                'tindakan'=>'Konsumsi 15-20g karbohidrat cepat serap'
             ];
         }
+
+        elseif ($level <= 99) {
+            return [
+                'label'=>'Normal (Puasa)',
+                'warna'=>'#4CAF50',
+                'keterangan'=>'Gula darah normal.',
+                'tindakan'=>'Pertahankan pola makan sehat'
+            ];
+        }
+
+        elseif ($level <=125) {
+            return [
+                'label'=>'Pra-Diabetes',
+                'warna'=>'#FFA726',
+                'keterangan'=>'Risiko diabetes meningkat.',
+                'tindakan'=>'Kurangi gula dan karbohidrat'
+            ];
+        }
+
+        elseif ($level <=199) {
+            return [
+                'label'=>'Diabetes',
+                'warna'=>'#F44336',
+                'keterangan'=>'Gula darah tinggi.',
+                'tindakan'=>'Konsultasi dokter'
+            ];
+        }
+
+
+        return [
+            'label'=>'Diabetes Kritis',
+            'warna'=>'#B71C1C',
+            'keterangan'=>'Gula darah sangat tinggi.',
+            'tindakan'=>'Segera hubungi dokter'
+        ];
     }
 }

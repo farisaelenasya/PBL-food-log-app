@@ -22,6 +22,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('profile', [ProfileController::class, 'update']);
     Route::post('/profile', [ProfileController::class, 'update']);
     Route::apiResource('glucoses', GlucoseController::class);
+    Route::post('/food-logs', [FoodLogController::class, 'store']);
+    Route::get('/food-logs', [FoodLogController::class, 'index']);
+
+    Route::get('/admin/food-logs', 
+        [FoodLogController::class, 'adminFoodLogs']);
+    Route::get('/points', [FoodLogController::class, 'getPoints']);
+    Route::get('/points/history', [FoodLogController::class, 'pointHistory']);
     Route::apiResource('admin/patients', AdminController::class);
     Route::get('/admin/patients/{id}/glucose', [AdminController::class, 'patientGlucose']);
 });
@@ -34,13 +41,7 @@ Route::post('/verifikasi-otp', [AuthController::class, 'verifikasiOtp']);
 Route::get('/foods', [FoodController::class, 'all']);
 Route::get('/foods/search', [FoodController::class, 'search']);
 
-Route::post('/food-logs', [FoodLogController::class, 'store']);
-Route::get('/food-logs', [FoodLogController::class, 'index']);
-
 Route::post('/detect-food', [FoodVisionController::class, 'detectFood']);
-
-Route::get('/points', [FoodLogController::class, 'getPoints']);
-Route::get('/points/history', [FoodLogController::class, 'pointHistory']);
 
 // ARTIKEL
 Route::get('/artikel', [ArtikelController::class, 'index']);

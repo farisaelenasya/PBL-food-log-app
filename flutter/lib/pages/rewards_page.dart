@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'yoga_video_page.dart';
+import 'healthy_meal_page.dart';
 
 class RewardsPage extends StatefulWidget {
   const RewardsPage({super.key});
@@ -162,8 +163,8 @@ class _RewardsPageState extends State<RewardsPage> {
               _buildBarisPoin(Icons.water_drop_outlined, Colors.blue,
                   'Catat Gula Darah','Setiap input gula darah','+10 poin',Colors.blue,),
 
-             _buildBarisPoin( Icons.local_fire_department_outlined,Colors.orange,
-                  'Streak 7 Hari','Input konsisten 7 hari berturut-turut','+50 poin bonus', Colors.orange,),
+             _buildBarisPoin( Icons.vaccines_outlined, Colors.purple,
+                  'Pelacak Insulin','Setiap catat dosis insulin','+10 poin', Colors.purple,),
 
               const SizedBox(height: 20),
 
@@ -175,18 +176,25 @@ class _RewardsPageState extends State<RewardsPage> {
               const SizedBox(height: 13),
 
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child:_buildKartuHadiah(Icons.self_improvement,
-                    'Yoga Online Class','Video stretching & relaksasi',
+                    child:_buildKartuHadiah(
+                    Icons.self_improvement,
+                    'Yoga Online Class',
+                    'Video stretching & relaksasi',
                     '300 poin',
-),
+                    const YogaVideoPage(),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildKartuHadiah(Icons.restaurant_menu,'Healthy Meal Plan',
+                    child: _buildKartuHadiah(
+                    Icons.restaurant_menu,
+                    'Healthy Meal Plan',
                     'Menu 3 hari untuk kontrol gula darah',
                     '400 poin',
+                    const HealthyMealPage(),
                     ),
                   ),
                 ],
@@ -246,9 +254,9 @@ class _RewardsPageState extends State<RewardsPage> {
     String judul,
     String subjudul,
     String poin,
+    Widget halamanTujuan,
   ) {
     return Container(
-      height: 170,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -263,20 +271,22 @@ class _RewardsPageState extends State<RewardsPage> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(ikon, color: const Color(0xFF2979FF)),
           const SizedBox(height: 10),
           Text(judul, style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text(subjudul),
+          const SizedBox(height: 4),
+          Text(subjudul, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-               onPressed: () {Navigator.push(context,MaterialPageRoute(
-                builder: (_) => const YogaVideoPage(),
-               ),
-              );
+               onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => halamanTujuan),
+                );
              },
               child: Text(poin),
             ),

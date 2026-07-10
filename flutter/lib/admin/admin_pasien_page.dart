@@ -155,30 +155,46 @@ class _AdminPasienPageState extends State<AdminPasienPage> {
     );
   }
 
-  Widget _buildAppBar(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            'Admin Log Medis',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1A2340),
+ Widget _buildAppBar(BuildContext context) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    color: Colors.white,
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'Daftar Pasien',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1A2340),
+              ),
             ),
+            SizedBox(height: 3),
+            Text(
+              'Kelola data pasien terdaftar',
+              style: TextStyle(
+                fontSize: 11,
+                color: Color(0xFF78909C),
+              ),
+            ),
+          ],
+        ),
+        IconButton(
+          onPressed: _refresh,
+          icon: const Icon(
+            Icons.refresh_rounded,
+            color: Color(0xFF78909C),
+            size: 22,
           ),
-          IconButton(
-            onPressed: _refresh,
-            icon: const Icon(Icons.refresh_rounded,
-                color: Color(0xFF78909C), size: 22),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildBannerKelola() {
     return Container(

@@ -11,8 +11,8 @@ dependencies:
     sdk: flutter
 
   # YT (AMAN WEB + MOBILE)
-  youtube_player_iframe: ^5.2.1
-  url_launcher: ^6.3.0
+  youtube_player_iframe: ^5.2.2
+  url_launcher: ^6.3.2
 
   # UI
   cupertino_icons: ^1.0.8
@@ -22,10 +22,10 @@ dependencies:
   shared_preferences: ^2.3.3
 
   # Image & Camera
-  image_picker: ^1.0.7
+  image_picker: ^1.2.2
 
   # Env
-  flutter_dotenv: ^5.1.0
+  flutter_dotenv: ^5.2.1
 
   # Utilities
   uuid: ^4.4.0
@@ -42,7 +42,7 @@ dependencies:
   timezone: ^0.9.4        
 
   # Charts
-  fl_chart: ^0.66.0
+  fl_chart: ^0.66.2
 
 dev_dependencies:
   flutter_test:

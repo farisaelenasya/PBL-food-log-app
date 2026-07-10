@@ -8,15 +8,21 @@ import 'api_config.dart';
 class ApiService {
   static String get baseUrl => ApiConfig.baseUrl;
   
-  static Future<Map<String, String>> _authHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
-    return {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
-  }
+static Future<Map<String, String>> _authHeaders() async {
+  final prefs = await SharedPreferences.getInstance();
+
+  final token = prefs.getString('token');
+
+  debugPrint("================================");
+  debugPrint("TOKEN DI FLUTTER : $token");
+  debugPrint("================================");
+
+  return {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Authorization': 'Bearer ${token ?? ''}',
+  };
+}
 
 /// Kirim data gula darah ke Laravel
 static Future<bool> simpanGlukosa({
@@ -258,7 +264,27 @@ static Future<bool> simpanGlukosa({
       return [];
     }
   }
+static Future<List<dynamic>> getAdminFoodLogs() async {
 
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  final response = await http.get(
+    Uri.parse('${ApiConfig.baseUrl}/admin/food-logs'),
+    headers:{
+      'Accept':'application/json',
+      'Authorization':'Bearer $token',
+    },
+  );
+
+  print("STATUS FOOD LOG ADMIN: ${response.statusCode}");
+  print("BODY FOOD LOG ADMIN: ${response.body}");
+
+  final json = jsonDecode(response.body);
+
+  return json['data'] ?? [];
+
+}
   // POINTS
   static Future<Map<String, dynamic>> getPoints() async {
     try {

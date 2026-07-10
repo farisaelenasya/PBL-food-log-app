@@ -46,36 +46,40 @@ void initState() {
 Future<void> _loadArtikel() async {
   try {
     final data = await ApiService.getArtikel();
-   
-   for (var e in data) {
-  debugPrint("JUDUL: ${e.judul}");
-  debugPrint("LINK: ${e.linkArtikel}");
-}
-    setState(() {
-  _artikel = data.map((e) {
-    return DataArtikel(
-  judul: e.judul,
-  kategori: e.kategori,
-  tanggal: DateFormat(
-    'dd MMM yyyy',
-  ).format(
-    DateTime.parse(e.createdAt),
-  ),
-  diterbitkan: true,
-  isiSingkat: e.isi,
-  linkArtikel: e.linkArtikel,
-);
-  }).toList();
 
-  _isLoading = false;
-});
-  }catch (e) {
+    setState(() {
+      _artikel = data.map((e) {
+        return DataArtikel(
+          judul: e.judul,
+          kategori: e.kategori,
+          tanggal: DateFormat(
+            'dd MMM yyyy',
+          ).format(
+            DateTime.parse(e.createdAt),
+          ),
+          diterbitkan: true,
+          isiSingkat: e.isi,
+          linkArtikel: e.linkArtikel,
+        );
+      }).toList();
+
+      _isLoading = false;
+    });
+
+  } catch (e) {
     debugPrint("ERROR ARTIKEL: $e");
 
     setState(() {
       _isLoading = false;
     });
   }
+}
+Future<void> _refresh() async {
+  setState(() {
+    _isLoading = true;
+  });
+
+  await _loadArtikel();
 }
 
   final List<String> _kategoriList = [
@@ -250,7 +254,7 @@ Future<void> _loadArtikel() async {
   }
 
   
-    Widget _buildAppBar() {
+Widget _buildAppBar() {
   return Container(
     padding: const EdgeInsets.symmetric(
       horizontal: 20,
@@ -260,20 +264,51 @@ Future<void> _loadArtikel() async {
     child: Row(
       children: [
         Container(
-          width: 4,
-          height: 24,
+          width: 42,
+          height: 42,
           decoration: BoxDecoration(
             color: const Color(0xFF1A73E8),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(
+            Icons.article_outlined,
+            color: Colors.white,
+            size: 22,
           ),
         ),
-        const SizedBox(width: 10),
-        const Text(
-          'AdminFoodLog',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF1A2340),
+
+        const SizedBox(width: 12),
+
+        const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Kelola Artikel',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1A2340),
+              ),
+            ),
+            SizedBox(height: 3),
+            Text(
+              'Konten edukasi pasien diabetes',
+              style: TextStyle(
+                fontSize: 11,
+                color: Color(0xFF90A4AE),
+              ),
+            ),
+          ],
+        ),
+
+        const Spacer(),
+
+        IconButton(
+          onPressed: _refresh,
+          icon: const Icon(
+            Icons.refresh_rounded,
+            color: Color(0xFF78909C),
+            size: 24,
           ),
         ),
       ],

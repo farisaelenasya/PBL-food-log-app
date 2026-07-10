@@ -45,7 +45,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       try {
         final glukosa  = await ApiService.ambilSemuaData();
-        final foodLogs = await ApiService.getFoodLogs();
+        final foodLogs = await ApiService.getAdminFoodLogs();
 
         final List<Map<String, dynamic>> temp = [];
 
@@ -60,14 +60,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         }
 
         for (final f in foodLogs.take(5)) {
-          temp.add({
-            'nama' : 'Pasien',
-            'info' : 'Catat makanan: ${f['nama_makanan']} (${(f['kalori'] as num?)?.toStringAsFixed(0) ?? '0'} kkal)',
-            'waktu': f['dicatat_pada'] ?? '',
-            'warna': const Color(0xFF26A69A),
-            'ikon' : Icons.restaurant_outlined,
-          });
-        }
+  temp.add({
+    'nama' : f['user']?['name'] ?? 'Pasien',
+    'info' : 'Catat makanan: ${f['nama_makanan']} (${(f['kalori'] as num?)?.toStringAsFixed(0) ?? '0'} kkal)',
+    'waktu': f['created_at'] ?? '',
+    'warna': const Color(0xFF26A69A),
+    'ikon' : Icons.restaurant_outlined,
+  });
+}
 
         temp.sort((a, b) =>
             (b['waktu'] as String).compareTo(a['waktu'] as String));
